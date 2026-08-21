@@ -1,8 +1,8 @@
-﻿# OffGit
+# offGIT
 
 An ambient cross-IDE continuity and auto-sync harness for developers.
 
-OffGit sits underneath Claude Code, Cursor, Google Antigravity, Godot Engine, and Arduino IDE. It continuously keeps your GitHub repositories synchronized, generates structured devlogs and live context snapshots, and enables seamless tool-switching (e.g. when quota runs out) without losing conversational or technical momentum.
+offGIT sits underneath Claude Code, Cursor, Google Antigravity, Godot Engine, and Arduino IDE. It continuously keeps your GitHub repositories synchronized, generates structured devlogs and live context snapshots, and enables seamless tool-switching (e.g. when quota runs out) without losing conversational or technical momentum.
 
 ## Core Capabilities
 

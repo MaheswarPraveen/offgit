@@ -30,7 +30,7 @@ logging.basicConfig(
     format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
-logger = logging.getLogger("OffGit")
+logger = logging.getLogger("offGIT")
 
 SOURCE_ATTRIBUTIONS = {
     "claude-code": "AI-assisted (Claude Code)",
@@ -138,7 +138,7 @@ def ensure_tool_pointers(repo_path: str) -> None:
         logger.debug(f"Could not write .cursorrules in {repo_path}: {e}")
 
 def get_diff(repo_path: str) -> str:
-    """git diff HEAD â€” sole source of truth for 'what changed'."""
+    """git diff HEAD Ã¢â‚¬â€ sole source of truth for 'what changed'."""
     if not (Path(repo_path) / ".git").exists():
         return ""
 
@@ -261,7 +261,7 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
 
 def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -> str:
     """One headless LLM call to draft a natural, context-aware confirmation question."""
-    fallback = f"Looks like you are actively working on '{project_hint}' â€” want me to create a GitHub repo for this?"
+    fallback = f"Looks like you are actively working on '{project_hint}' Ã¢â‚¬â€ want me to create a GitHub repo for this?"
 
     if not prompt_log:
         return fallback
@@ -273,7 +273,7 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
         "Based on these recent 5 developer prompts, generate a natural 1-sentence confirmation question "
         "asking the user if they want a GitHub repository created and scaffolded for this project.\n\n"
         f"PROMPTS:\n{json.dumps(summaries, indent=2)}\n\n"
-        "Rules: No emojis. Output ONLY the plain text question (e.g. 'Looks like you are building a sensor fusion module for the quadruped â€” want me to create a GitHub repo for this?')."
+        "Rules: No emojis. Output ONLY the plain text question (e.g. 'Looks like you are building a sensor fusion module for the quadruped Ã¢â‚¬â€ want me to create a GitHub repo for this?')."
     )
 
     if cli_cmd in ["claude", "cursor-agent"]:
@@ -281,10 +281,10 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
         if code == 0 and out.strip():
             clean_q = strip_emojis(out.strip()).strip('"').strip("'")
             if "?" in clean_q:
-                return clean_q.replace("â€”", "-")
+                return clean_q.replace("Ã¢â‚¬â€", "-")
 
     last_action = summaries[-1] if summaries else project_hint
-    return f"Looks like you are actively working on '{last_action}' â€” want me to create a GitHub repo for this?"
+    return f"Looks like you are actively working on '{last_action}' Ã¢â‚¬â€ want me to create a GitHub repo for this?"
 
 def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
     """Appends a timestamped section to DEVLOG.md with source attribution."""
@@ -292,14 +292,14 @@ def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     attribution = SOURCE_ATTRIBUTIONS.get(trigger_source, f"Source ({trigger_source})")
 
-    entry = f"\n## {now_str} â€” {attribution}\n\n{strip_emojis(summary)}\n"
+    entry = f"\n## {now_str} Ã¢â‚¬â€ {attribution}\n\n{strip_emojis(summary)}\n"
 
     if devlog_path.exists():
         content = devlog_path.read_text(encoding="utf-8")
         devlog_path.write_text(content.rstrip() + "\n" + entry, encoding="utf-8")
     else:
         repo_name = Path(repo_path).name
-        header = f"# Development Log: {repo_name}\n\nAutomated continuity log maintained by OffGit.\n"
+        header = f"# Development Log: {repo_name}\n\nAutomated continuity log maintained by offGIT.\n"
         devlog_path.write_text(header + entry, encoding="utf-8")
 
     logger.info(f"Appended entry to DEVLOG.md in {repo_path} ({attribution})")
@@ -362,7 +362,7 @@ def commit_and_push(repo_path: str) -> None:
     code, _, err = run_cmd(["git", "push"], cwd=repo_path)
     if code == 0:
         logger.info(f"Pushed commit to remote in {repo_path}")
-        notify(f"OffGit Synced: {Path(repo_path).name}", f"Pushed updates to GitHub at {timestamp}")
+        notify(f"offGIT Synced: {Path(repo_path).name}", f"Pushed updates to GitHub at {timestamp}")
     else:
         logger.warning(f"Git push failed in {repo_path} (remote may not be set): {err}")
 
@@ -394,7 +394,7 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     clean_q = strip_emojis(question_text).replace("'", "''").replace('"', '`"')
     ps_script = f"""
 Add-Type -AssemblyName PresentationFramework
-$result = [System.Windows.MessageBox]::Show('{clean_q}', 'OffGit - New Project: {project_name}', [System.Windows.MessageBoxButton]::YesNo, [System.Windows.MessageBoxImage]::Question)
+$result = [System.Windows.MessageBox]::Show('{clean_q}', 'offGIT - New Project: {project_name}', [System.Windows.MessageBoxButton]::YesNo, [System.Windows.MessageBoxImage]::Question)
 if ($result -eq [System.Windows.MessageBoxResult]::Yes) {{ exit 0 }} else {{ exit 1 }}
 """
     res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], capture_output=True)
@@ -409,7 +409,7 @@ if ($result -eq [System.Windows.MessageBoxResult]::Yes) {{ exit 0 }} else {{ exi
 
     readme = p_path / "README.md"
     if not readme.exists():
-        readme.write_text(f"# {project_name}\n\nProject scaffolded by OffGit.\n", encoding="utf-8")
+        readme.write_text(f"# {project_name}\n\nProject scaffolded by offGIT.\n", encoding="utf-8")
 
     arch = p_path / "ARCHITECTURE.md"
     if not arch.exists():
@@ -473,7 +473,7 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
     readme_lines = [
         "# Private Technical Thoughts & Decision Corpus\n",
-        "Private repository of architecture decisions and developer reasoning maintained by OffGit.\n",
+        "Private repository of architecture decisions and developer reasoning maintained by offGIT.\n",
         "## Recent Decisions\n"
     ]
     for md in all_mds:
@@ -532,7 +532,7 @@ def notify(title: str, message: str) -> None:
         f"$textNodes.Item(0).AppendChild($template.CreateTextNode('{clean_title}')) > $null; "
         f"$textNodes.Item(1).AppendChild($template.CreateTextNode('{clean_msg}')) > $null; "
         f"$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
-        f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OffGit').Show($toast);"
+        f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('offGIT').Show($toast);"
     )
     subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -541,7 +541,7 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
         logger.warning(f"Invalid repo_path passed to run_sync: {repo_path}")
         return
 
-    logger.info(f"Running OffGit sync on {repo_path} (trigger: {trigger_source})")
+    logger.info(f"Running offGIT sync on {repo_path} (trigger: {trigger_source})")
 
     diff = get_diff(repo_path)
     prompt_context = read_prompt_log(repo_path)
@@ -565,7 +565,7 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
     classify_thought(diff, prompt_context, trigger_source)
 
 def main():
-    parser = argparse.ArgumentParser(description="OffGit Core Engine")
+    parser = argparse.ArgumentParser(description="offGIT Core Engine")
     parser.add_argument("--repo", type=str, help="Path to project repository")
     parser.add_argument("--trigger", type=str, default="cli", help="Trigger source identifier")
     parser.add_argument("--log-prompt", action="store_true", help="Append an entry to prompt-log.jsonl")
@@ -581,7 +581,7 @@ def main():
         update_context_md(args.repo, f"- Active prompt: {args.summary}")
         # Schedule debounced push
         schedule_debounced_context_push(args.repo, CONFIG.get("context_push_debounce_seconds", 120))
-        print(f"Logged prompt to OffGit. Current count: {count}")
+        print(f"Logged prompt to offGIT. Current count: {count}")
     elif args.repo:
         run_sync(args.repo, args.trigger)
     else:

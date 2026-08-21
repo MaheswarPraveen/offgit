@@ -1,4 +1,4 @@
-﻿# OffGit — Architectural Specification
+# offGIT — Architectural Specification
 
 ## Design Principles
 

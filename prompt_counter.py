@@ -15,7 +15,7 @@ from sync_engine import (
 )
 
 def main():
-    parser = argparse.ArgumentParser(description="OffGit Prompt Counter & Trigger")
+    parser = argparse.ArgumentParser(description="offGIT Prompt Counter & Trigger")
     parser.add_argument("--repo", type=str, required=True, help="Repository directory")
     parser.add_argument("--prompt", type=str, default="", help="Prompt text")
     parser.add_argument("--tool", type=str, default="claude-code", help="Tool name")

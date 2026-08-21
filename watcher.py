@@ -55,7 +55,7 @@ def devlog_fixed_interval_loop(handler: IdleEventHandler):
                 logger.error(f"Error in fixed interval sync on {repo}: {e}")
 
 def main():
-    logger.info("Starting OffGit filesystem watcher & interval engine...")
+    logger.info("Starting offGIT filesystem watcher & interval engine...")
     dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
     exts = CONFIG.get("watched_extensions", [".ino", ".gd", ".py", ".ts", ".cpp", ".h"])
 

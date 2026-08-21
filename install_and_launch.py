@@ -9,31 +9,31 @@ def run(cmd, check=True):
 
 def ensure_winget_package(cmd_name, winget_id, label):
     if shutil.which(cmd_name) is None:
-        print(f"[OffGit] Installing {label} via winget...")
+        print(f"[offGIT] Installing {label} via winget...")
         run(f"winget install --id {winget_id} -e --silent --accept-package-agreements --accept-source-agreements")
     else:
-        print(f"[OffGit] {label} already installed.")
+        print(f"[offGIT] {label} already installed.")
 
 def main():
-    print("[OffGit] Verifying system prerequisites...")
+    print("[offGIT] Verifying system prerequisites...")
     ensure_winget_package("git", "Git.Git", "Git")
     ensure_winget_package("gh", "GitHub.cli", "GitHub CLI")
     ensure_winget_package("node", "OpenJS.NodeJS.LTS", "Node.js")
 
     if shutil.which("claude") is None:
-        print("[OffGit] Checking Claude Code CLI...")
+        print("[offGIT] Checking Claude Code CLI...")
     if shutil.which("cursor-agent") is None:
-        print("[OffGit] Cursor CLI check (optional).")
+        print("[offGIT] Cursor CLI check (optional).")
 
     req_file = Path.home() / ".offgit" / "requirements.txt"
     run(f'"{sys.executable}" -m pip install -r "{req_file}" -q')
 
     status = run("gh auth status", check=False)
     if status.returncode != 0:
-        print("[OffGit] GitHub login required — opening browser for OAuth authorization...")
+        print("[offGIT] GitHub login required â€” opening browser for OAuth authorization...")
         run("gh auth login --web --git-protocol https -h github.com")
     else:
-        print("[OffGit] GitHub CLI authenticated.")
+        print("[offGIT] GitHub CLI authenticated.")
 
     watcher_script = Path.home() / ".offgit" / "watcher.py"
     pythonw = Path(sys.executable).parent / "pythonw.exe"
@@ -41,7 +41,7 @@ def main():
         pythonw = Path(sys.executable)
 
     schtasks_cmd = (
-        f'schtasks /create /tn "OffGit" /tr '
+        f'schtasks /create /tn "offGIT" /tr '
         f'"{pythonw} {watcher_script}" '
         f'/sc onlogon /f'
     )
@@ -49,7 +49,7 @@ def main():
 
     # Launch background watcher
     subprocess.Popen([str(pythonw), str(watcher_script)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("[OffGit] Done. OffGit is running in the background and registered for autostart.")
+    print("[offGIT] Done. offGIT is running in the background and registered for autostart.")
 
 if __name__ == "__main__":
     main()
