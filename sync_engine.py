@@ -418,15 +418,13 @@ def commit_and_push(repo_path: str) -> None:
         logger.warning(f"Git push failed in {repo_path} (remote may not be set): {err}")
 
 def should_trigger_repo_check(count: int) -> bool:
-    """Evaluates if the prompt count should trigger a repository creation check (after 5th prompt / every 5 prompts)."""
-    if count < 5:
-        return False
-    threshold = CONFIG.get("prompt_threshold", 5)
-    if isinstance(threshold, int):
-        return count % threshold == 0
-    if isinstance(threshold, list):
-        return count in threshold or (count % 5 == 0)
-    return count % 5 == 0
+    """Evaluates if the prompt count exactly matches one of the specified milestones [5, 15, 30, 60]."""
+    milestones = CONFIG.get("prompt_threshold", [5, 15, 30, 60])
+    if isinstance(milestones, list):
+        return count in milestones
+    if isinstance(milestones, int):
+        return count == milestones
+    return count in [5, 15, 30, 60]
 
 def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     """Prompts user with LLM-phrased question and allows custom repo naming before creation."""
