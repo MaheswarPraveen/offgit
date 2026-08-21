@@ -35,7 +35,7 @@ logger = logging.getLogger("offGIT")
 SOURCE_ATTRIBUTIONS = {
     "claude-code": "AI-assisted (Claude Code)",
     "cursor": "AI-assisted (Cursor)",
-    "antigravity": "AI-assisted (Antigravity)",
+    "antigravity": "AI-assisted (Antigravity)",`r`n    "codex": "AI-assisted (Codex)",
     "watcher": "Manual edit (Arduino IDE / Thonny / Godot)",
     "cli": "CLI execution"
 }
@@ -110,7 +110,7 @@ def ensure_tool_pointers(repo_path: str) -> None:
     pointer_line = "See CONTEXT.md for current project state."
     r_path = Path(repo_path)
 
-    claude_md = r_path / "CLAUDE.md"
+        claude_md = r_path / "CLAUDE.md"
     try:
         if claude_md.exists():
             c = claude_md.read_text(encoding="utf-8")
@@ -121,7 +121,16 @@ def ensure_tool_pointers(repo_path: str) -> None:
     except Exception as e:
         logger.debug(f"Could not write CLAUDE.md in {repo_path}: {e}")
 
-    cursor_rules_dir = r_path / ".cursor" / "rules"
+    codex_md = r_path / "CODEX.md"
+    try:
+        if codex_md.exists():
+            c = codex_md.read_text(encoding="utf-8")
+            if pointer_line not in c:
+                codex_md.write_text(f"{pointer_line}\n\n{c}", encoding="utf-8")
+        else:
+            codex_md.write_text(f"{pointer_line}\n", encoding="utf-8")
+    except Exception as e:
+        logger.debug(f"Could not write CODEX.md in {repo_path}: {e}")cursor_rules_dir = r_path / ".cursor" / "rules"
     cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     cursor_mdc = cursor_rules_dir / "context.mdc"
     try:
@@ -219,7 +228,7 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
         f"GIT DIFF:\n{diff}\n"
     )
 
-    if cli_cmd in ["claude", "cursor-agent"]:
+    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:4000].replace(chr(34), chr(39))}"')
         if code == 0 and out.strip():
             return strip_emojis(out.strip())
@@ -271,7 +280,7 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
         "Rules: No emojis. Plain ASCII text only. Output ONLY the question."
     )
 
-    if cli_cmd in ["claude", "cursor-agent"]:
+    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:2000].replace(chr(34), chr(39))}"')
         if code == 0 and out.strip():
             clean_q = strip_emojis(out.strip()).strip('"').strip("'")
@@ -295,7 +304,7 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
         "Rules: Output ONLY the lowercase kebab-case name (e.g. 'esp32-sensor-relay' or 'godot-combat-system'). No quotes, no markdown."
     )
 
-    if cli_cmd in ["claude", "cursor-agent"]:
+    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:2000].replace(chr(34), chr(39))}"')
         if code == 0 and out.strip():
             candidate = strip_emojis(out.strip()).strip('"').strip("'").lower()
