@@ -8,7 +8,7 @@
 
 **offGIT** is an ambient background harness engineered to bridge modern development environments into a unified, version-controlled workflow:
 
-- **AI-Native Coding Environments**: Google Antigravity, Cursor, Claude Code, Codex by GPT / GitHub Copilot, Codex / GitHub Copilot
+- **AI-Native Coding Environments**: Google Antigravity, Cursor, Claude Code
 - **Embedded & Specialized Editors (Filesystem Observer)**: Arduino IDE, Thonny (MicroPython / Python), Godot Engine (GDScript)
 
 By decoupling real-time local activity tracking from periodic remote synchronization, offGIT maintains complete technical context across tool transitions while eliminating manual Git overhead.
@@ -66,15 +66,15 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 
 ```text
 <project-root>/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ CONTEXT.md                 # Live snapshot of active objectives and implementation state
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ DEVLOG.md                  # Comprehensive chronological log with architectural rationale
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ CLAUDE.md                  # Configuration pointer for Claude Code environments
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ .cursorrules               # Configuration pointer for Cursor environments
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ .gitignore                 # Automatically configured exclusion for internal harness data
-Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ .offgit/
-    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
-    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ prompt-count           # Interval tracking counter
+|-- CONTEXT.md                 # Live snapshot of active objectives and implementation state
+|-- DEVLOG.md                  # Comprehensive chronological log with architectural rationale
+|-- CLAUDE.md                  # Configuration pointer for Claude Code environments
+|-- .cursorrules               # Configuration pointer for Cursor environments
+|-- .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
+|-- .gitignore                 # Automatically configured exclusion for internal harness data
+`-- .offgit/
+    |-- prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
+    `-- prompt-count           # Interval tracking counter
 ```
 
 ---
