@@ -1,0 +1,10 @@
+﻿# Development Log: offgit
+
+Automated continuity log maintained by OffGit.
+
+## 2026-08-22 02:30:00 - AI-assisted (Antigravity)
+
+- Initialized complete OffGit architecture implementation.
+- Added two-clock timing model (`CONTEXT.md` instant/debounced, `DEVLOG.md` 10-min hard interval).
+- Integrated LLM-phrased repo-creation prompt gate.
+- Configured cross-tool continuity pointers (`CLAUDE.md`, `.cursorrules`, `.cursor/rules/context.mdc`).

@@ -1,0 +1,28 @@
+llm_tool: claude
+devlog_interval_seconds: 600
+context_push_debounce_seconds: 120
+diff_char_limit: 8000
+watched_extensions:
+  - .ino
+  - .gd
+  - .py
+  - .ts
+  - .cpp
+  - .h
+  - .js
+  - .c
+  - .hpp
+  - .tscn
+  - .md
+prompt_threshold:
+  - 5
+  - 15
+  - 30
+  - 60
+thoughts_repo_path: C:\Users\xczma\.offgit\thoughts
+github_user: MaheswarPraveen
+notifications: windows_toast
+watched_directories:
+  - C:\Users\xczma\.gemini\antigravity\scratch
+  - C:\Users\xczma\Documents\Arduino
+  - C:\Users\xczma\Documents\Godot
