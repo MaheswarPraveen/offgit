@@ -1,4 +1,4 @@
-﻿# offGIT
+# offGIT
 
 **A unified ambient developer harness for continuous Git sync, cross-tool context, and automated devlogs.**
 
