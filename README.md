@@ -1,77 +1,107 @@
-# offGIT
+﻿# offGIT
 
-**A unified ambient developer harness for continuous Git sync, cross-tool context, and automated devlogs.**
+**Ambient cross-environment development harness for continuous repository synchronization, context preservation, and automated technical documentation.**
 
 ---
 
-## What is offGIT?
+## Overview
 
-**offGIT** is a unified harness that runs silently underneath your coding environments (**Google Antigravity, Cursor, Claude Code, Godot Engine, Arduino IDE**).
+**offGIT** is an ambient background harness engineered to bridge modern development environments (**Google Antigravity, Cursor, Claude Code, Godot Engine, Arduino IDE**) into a unified, version-controlled workflow.
 
-It connects your tools through a single shared sync engine, keeping your repositories current, devlogs automated, and active context unified across sessions.
+By decoupling real-time local activity tracking from periodic remote synchronization, offGIT maintains complete conversational and technical context across tool transitions while eliminating manual Git overhead.
 
 ```
                          +-------------------------------+
-                         |      UNIFIED CORE ENGINE      |
+                         |      CORE HARNESS ENGINE      |
                          |        sync_engine.py         |
                          +---------------+---------------+
                                          ^
-                                         | Calls engine
+                                         | Ingests state & triggers
         +----------------+---------------+---------------+----------------+
         |                |                               |                |
  +------+------+  +------+------+                 +------+------+  +------+------+
  | Claude Code |  |   Cursor    |                 | Antigravity |  | Filesystem  |
- | Hook        |  | Hook        |                 | Hook        |  | Watcher     |
+ | Hook Hook   |  | Event Hook  |                 | Tool Hook   |  | Watcher     |
  +-------------+  +-------------+                 +-------------+  +-------------+
 ```
 
 ---
 
-## What the Harness Does
+## Core Capabilities
 
-1. **Unified Cross-Tool Context (`CONTEXT.md`)**
-   - Writes a live snapshot of your current focus and reasoning on every prompt.
-   - Claude Code, Cursor, and Antigravity automatically read `CONTEXT.md` on startup via standard pointers (`CLAUDE.md`, `.cursorrules`).
-   - If you switch tools mid-project, the new tool picks up immediately where you left off.
+### 1. Cross-Tool Context Continuity (`CONTEXT.md`)
+- Maintains an up-to-date snapshot of active implementation focus, directives, and technical reasoning directly in the repository root.
+- Standardized configuration pointers (`CLAUDE.md`, `.cursorrules`, `.cursor/rules/context.mdc`) ensure that secondary IDEs ingest project context immediately upon session initialization, eliminating repetitive onboarding and context loss during tool switching.
 
-2. **Automated Devlogs & Git Sync (`DEVLOG.md`)**
-   - Evaluates real `git diff HEAD` every 10 minutes.
-   - Writes factual changelog entries tagged with source attribution (`AI-assisted` vs `Manual edit`).
-   - Automatically commits and pushes to your repository.
+### 2. High-Performance Decoupled Synchronization (`DEVLOG.md`)
+- **Zero-Latency Activity Logging (< 1ms)**: Appends prompts, directives, and architectural rationale to local workspace metadata instantaneously without blocking editor responsiveness or executing synchronous network operations.
+- **Batched Git Synchronization**: Executes on a structured 10-minute cadence. Analyzes unified `git diff HEAD` snapshots, produces factual changelogs via LLM summarization, and commits changes with source attribution (`AI-assisted` vs. `Manual edit`).
 
-3. **Milestone Project Inception**
-   - Tracks prompt milestones (`5, 15, 30, 60`).
-   - At 5 prompts on a new project, offGIT generates a context-aware question and offers to scaffold and publish the GitHub repository.
+### 3. Automated Project Inception
+- Analyzes interaction volume at defined conversational intervals (5, 15, 30, 60 prompts).
+- Suggests structured kebab-case repository naming derived from conversational context and prompts the developer via a clean interactive interface prior to remote provisioning via GitHub CLI.
 
-4. **Private Thoughts Corpus**
-   - Automatically records genuine architecture decisions into a private `thoughts` repository.
+### 4. Technical Decision Archive
+- Automatically identifies architectural design patterns, trade-offs, and decisions, recording them into a centralized private decision repository (`~/.offgit/thoughts/`).
 
 ---
 
-## Project Structure
+## Repository Structure
+
+Projects managed by offGIT adhere to a clean, standardized structure:
 
 ```text
 <project-root>/
-├── CONTEXT.md                 # Live snapshot of current focus and state
-├── DEVLOG.md                  # Chronological devlog with AI rationale
-├── CLAUDE.md                  # "See CONTEXT.md for current project state."
-├── .cursorrules               # "See CONTEXT.md for current project state."
-├── .cursor/rules/context.mdc  # Cursor rule pointer
-├── .gitignore                 # Automatically ignores .offgit/ internal logs
+├── CONTEXT.md                 # Live snapshot of active objectives and implementation state
+├── DEVLOG.md                  # Comprehensive chronological log with architectural rationale
+├── CLAUDE.md                  # Configuration pointer for Claude Code environments
+├── .cursorrules               # Configuration pointer for Cursor environments
+├── .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
+├── .gitignore                 # Automatically configured exclusion for internal harness data
 └── .offgit/
-    ├── prompt-log.jsonl       # Prompt & reasoning log (local-only, gitignored)
-    └── prompt-count           # Milestone counter (5, 15, 30, 60)
+    ├── prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
+    └── prompt-count           # Interval tracking counter
 ```
 
 ---
 
 ## Quick Start
 
+### Installation & Initialization
+
 ```powershell
 python install_and_launch.py
 ```
 
-This verifies prerequisites, installs dependencies, verifies GitHub CLI authentication, registers Windows Task Scheduler for logon autostart, and starts the background harness.
+The installer verifies system dependencies (`git`, `gh`, `node`, `claude`), installs required Python modules (`pyyaml`, `watchdog`), validates GitHub CLI authentication, registers Windows Task Scheduler autostart on logon, and initializes the background daemon.
+
+### Configuration (`~/.offgit/config.yaml`)
+
+```yaml
+llm_tool: claude                       # Headless CLI provider for automated summarization
+devlog_interval_seconds: 600           # Cadence for batched repository synchronization (10 min)
+context_push_debounce_seconds: 120     # Debounce threshold for context updates
+diff_char_limit: 8000                  # Maximum character limit for diff evaluation
+watched_extensions:                    # File patterns monitored by the filesystem observer
+  - .ino
+  - .gd
+  - .py
+  - .ts
+  - .cpp
+  - .h
+  - .js
+  - .c
+  - .hpp
+  - .tscn
+  - .md
+prompt_threshold:                      # Prompt intervals for repository inception checks
+  - 5
+  - 15
+  - 30
+  - 60
+thoughts_repo_path: ~/.offgit/thoughts # Path to private architectural decision repository
+notifications: windows_toast           # Desktop notification provider
+```
 
 ---
 

@@ -427,7 +427,7 @@ def should_trigger_repo_check(count: int) -> bool:
     return count in [5, 15, 30, 60]
 
 def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
-    """Prompts user with LLM-phrased question and allows custom repo naming before creation."""
+    """Prompts user with context-aware question and allows custom repository naming before provisioning."""
     if (Path(repo_path) / ".git").exists():
         code, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path)
         if code == 0 and remote_out.strip():
@@ -457,17 +457,68 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
         logger.info(f"User postponed repository creation for {project_name} at prompt {count}.")
         return False
 
-    logger.info(f"Creating repository with confirmed name: {final_repo_name}")
+    logger.info(f"Initializing repository with confirmed name: {final_repo_name}")
     p_path = Path(repo_path)
     p_path.mkdir(parents=True, exist_ok=True)
 
+    # 1. Professional README.md
     readme = p_path / "README.md"
     if not readme.exists():
-        readme.write_text(f"# {final_repo_name}\n\nProject created autonomously by offGIT.\n", encoding="utf-8")
+        readme_content = f"""# {final_repo_name}
 
+**Production-grade technical implementation and project repository.**
+
+---
+
+## Overview
+
+This repository contains the codebase and architectural specifications for **{final_repo_name}**.
+
+- **Live Project State**: Consult [`CONTEXT.md`](./CONTEXT.md) for current focus and open technical decisions.
+- **Changelog & Rationale**: Review [`DEVLOG.md`](./DEVLOG.md) for chronological development updates and technical trade-offs.
+- **Architecture**: See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system design and component specifications.
+
+---
+
+## Getting Started
+
+Refer to project configuration and dependency files to initialize the local build environment.
+
+---
+
+*Continuous context and repository synchronization maintained by offGIT.*
+"""
+        readme.write_text(readme_content, encoding="utf-8")
+
+    # 2. Professional ARCHITECTURE.md
     arch = p_path / "ARCHITECTURE.md"
     if not arch.exists():
-        arch.write_text(f"# Architecture: {final_repo_name}\n\n## Overview\n\nInitial architectural design.\n", encoding="utf-8")
+        arch_content = f"""# System Architecture: {final_repo_name}
+
+## 1. Architectural Overview
+
+This document outlines the core system design, component boundaries, and implementation patterns for **{final_repo_name}**.
+
+---
+
+## 2. Key Components
+
+- **Core Module**: Primary application logic and state management.
+- **Interfaces & Adapters**: Ingestion, input handling, and external protocol bridges.
+- **Configuration & Storage**: Persistent parameters, configuration schemas, and data structures.
+
+---
+
+## 3. Decision Log
+
+Historical architectural decisions and technical trade-offs are documented continuously in [`DEVLOG.md`](./DEVLOG.md).
+"""
+        arch.write_text(arch_content, encoding="utf-8")
+
+    # 3. Professional CONTEXT.md
+    context_file = p_path / "CONTEXT.md"
+    if not context_file.exists():
+        update_context_md(repo_path, f"- Initial project repository initialized for {final_repo_name}.")
 
     ensure_gitignore(repo_path)
     ensure_tool_pointers(repo_path)
@@ -481,7 +532,7 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     if code == 0:
         run_cmd(["git", "remote", "add", "origin", f"https://github.com/{gh_user}/{final_repo_name}.git"], cwd=repo_path)
         run_cmd(["git", "add", "-A"], cwd=repo_path)
-        run_cmd(["git", "commit", "-m", "feat: initial project scaffolding by offGIT"], cwd=repo_path)
+        run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
         run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
         logger.info(f"Successfully created and pushed remote repo {gh_user}/{final_repo_name}")
         notify("Repository Created", f"Created and scaffolded {gh_user}/{final_repo_name}")
