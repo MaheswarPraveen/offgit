@@ -11,6 +11,7 @@ from sync_engine import (
     update_context_md,
     schedule_debounced_context_push,
     maybe_scaffold_repo,
+    should_trigger_repo_check,
     logger
 )
 
@@ -39,9 +40,8 @@ def main():
     debounce_sec = CONFIG.get("context_push_debounce_seconds", 120)
     schedule_debounced_context_push(str(repo_path), debounce_sec)
 
-    # 4. Check prompt milestone threshold
-    milestones = CONFIG.get("prompt_threshold", [5, 15, 30, 60])
-    if count in milestones:
+    # 4. Check prompt milestone threshold (triggers after 5th prompt / every 5 prompts)
+    if should_trigger_repo_check(count):
         project_name = repo_path.name
         maybe_scaffold_repo(str(repo_path), project_name)
 

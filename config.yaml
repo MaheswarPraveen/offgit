@@ -14,11 +14,7 @@ watched_extensions:
   - .hpp
   - .tscn
   - .md
-prompt_threshold:
-  - 5
-  - 15
-  - 30
-  - 60
+prompt_threshold: 5
 thoughts_repo_path: C:\Users\xczma\.offgit\thoughts
 github_user: MaheswarPraveen
 notifications: windows_toast

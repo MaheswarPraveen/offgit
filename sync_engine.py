@@ -417,12 +417,35 @@ def commit_and_push(repo_path: str) -> None:
     else:
         logger.warning(f"Git push failed in {repo_path} (remote may not be set): {err}")
 
+def should_trigger_repo_check(count: int) -> bool:
+    """Evaluates if the prompt count should trigger a repository creation check (after 5th prompt / every 5 prompts)."""
+    if count < 5:
+        return False
+    threshold = CONFIG.get("prompt_threshold", 5)
+    if isinstance(threshold, int):
+        return count % threshold == 0
+    if isinstance(threshold, list):
+        return count in threshold or (count % 5 == 0)
+    return count % 5 == 0
+
 def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     """Prompts user with LLM-phrased question and allows custom repo naming before creation."""
     if (Path(repo_path) / ".git").exists():
         code, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path)
         if code == 0 and remote_out.strip():
             return False
+
+    auto_dir = Path(repo_path) / ".offgit"
+    count_file = auto_dir / "prompt-count"
+    count = 0
+    if count_file.exists():
+        try:
+            count = int(count_file.read_text(encoding="utf-8").strip())
+        except ValueError:
+            count = 0
+
+    if not should_trigger_repo_check(count):
+        return False
 
     prompt_context = read_prompt_log(repo_path)
     tool = CONFIG.get("llm_tool", "claude")
@@ -433,7 +456,7 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     final_repo_name = prompt_for_repo_name(suggested_name, question_text)
 
     if not final_repo_name:
-        logger.info(f"User postponed repository creation for {project_name}.")
+        logger.info(f"User postponed repository creation for {project_name} at prompt {count}.")
         return False
 
     logger.info(f"Creating repository with confirmed name: {final_repo_name}")
@@ -468,9 +491,7 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
     else:
         logger.error(f"gh repo create failed: {err}")
 
-    return False
-
-def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
+    return Falsedef classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     if not prompt_context and not diff:
         return
 
