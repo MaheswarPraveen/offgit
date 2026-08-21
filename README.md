@@ -1,4 +1,4 @@
-# offGIT
+﻿# offGIT
 
 **Ambient cross-environment development harness for continuous repository synchronization, context preservation, and automated technical documentation.**
 
@@ -9,7 +9,7 @@
 **offGIT** is an ambient background harness engineered to bridge modern development environments into a unified, version-controlled workflow:
 
 - **AI-Native Coding Environments**: Google Antigravity, Cursor, Claude Code, Codex / GitHub Copilot
-- **Embedded & Specialized IDEs (Filesystem Observer)**: Arduino IDE, Thonny (MicroPython / Python), Godot Engine (GDScript)
+- **Embedded & Specialized Editors (Filesystem Observer)**: Arduino IDE, Thonny (MicroPython / Python), Godot Engine (GDScript)
 
 By decoupling real-time local activity tracking from periodic remote synchronization, offGIT maintains complete technical context across tool transitions while eliminating manual Git overhead.
 
@@ -43,9 +43,13 @@ By decoupling real-time local activity tracking from periodic remote synchroniza
 - **Zero-Latency Activity Logging (< 1ms)**: Appends prompts, directives, and architectural rationale to local workspace metadata instantaneously without blocking editor responsiveness or executing synchronous network operations.
 - **Batched Git Synchronization**: Executes on a structured 10-minute cadence. Analyzes unified `git diff HEAD` snapshots, produces factual changelogs via LLM summarization, and commits changes with source attribution (`AI-assisted` vs. `Manual edit (Arduino IDE / Thonny / Godot)`).
 
-### 3. File Watching for Embedded & Specialized Editors
-- Transparently monitors file modifications across Arduino sketches (`.ino`), Thonny Python / MicroPython scripts (`.py`), and Godot scenes & scripts (`.gd`, `.tscn`).
-- Ensures non-hooked environments receive continuous automated version control without requiring custom plugins or extensions.
+### 3. How Non-AI Editors Work (Arduino IDE, Thonny, Godot)
+For environments that lack native AI extension APIs, offGIT provides automated LLM-assisted Git operations completely out-of-the-box:
+
+1. **Filesystem Change Detection**: `watcher.py` monitors file save events across `.ino`, `.py`, `.gd`, `.tscn`, `.c`, and `.cpp` files.
+2. **Git Diff Extraction**: At the 10-minute batch mark, the engine extracts the real code modifications using `git diff HEAD`.
+3. **Headless LLM Inspection**: The raw diff is sent to the configured LLM CLI (Claude / Antigravity / Cursor) to inspect the technical changes and produce a structured summary of what was implemented (e.g. pin configurations, interrupt handlers, logic loops).
+4. **Automated Commit & Remote Upload**: The LLM-generated changelog is appended to `DEVLOG.md` under `Manual edit (Arduino IDE / Thonny / Godot)`, `CONTEXT.md` is updated, and all code changes are committed and pushed to GitHub.
 
 ### 4. Automated Project Inception
 - Analyzes interaction volume at defined conversational intervals (5, 15, 30, 60 prompts).
@@ -62,15 +66,15 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 
 ```text
 <project-root>/
-â”œâ”€â”€ CONTEXT.md                 # Live snapshot of active objectives and implementation state
-â”œâ”€â”€ DEVLOG.md                  # Comprehensive chronological log with architectural rationale
-â”œâ”€â”€ CLAUDE.md                  # Configuration pointer for Claude Code environments
-â”œâ”€â”€ .cursorrules               # Configuration pointer for Cursor environments
-â”œâ”€â”€ .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
-â”œâ”€â”€ .gitignore                 # Automatically configured exclusion for internal harness data
-â””â”€â”€ .offgit/
-    â”œâ”€â”€ prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
-    â””â”€â”€ prompt-count           # Interval tracking counter
+├── CONTEXT.md                 # Live snapshot of active objectives and implementation state
+├── DEVLOG.md                  # Comprehensive chronological log with architectural rationale
+├── CLAUDE.md                  # Configuration pointer for Claude Code environments
+├── .cursorrules               # Configuration pointer for Cursor environments
+├── .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
+├── .gitignore                 # Automatically configured exclusion for internal harness data
+└── .offgit/
+    ├── prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
+    └── prompt-count           # Interval tracking counter
 ```
 
 ---
