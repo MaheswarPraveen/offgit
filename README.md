@@ -66,15 +66,15 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 
 ```text
 <project-root>/
-├── CONTEXT.md                 # Live snapshot of active objectives and implementation state
-├── DEVLOG.md                  # Comprehensive chronological log with architectural rationale
-├── CLAUDE.md                  # Configuration pointer for Claude Code environments
-├── .cursorrules               # Configuration pointer for Cursor environments
-├── .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
-├── .gitignore                 # Automatically configured exclusion for internal harness data
-└── .offgit/
-    ├── prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
-    └── prompt-count           # Interval tracking counter
+â”œâ”€â”€ CONTEXT.md                 # Live snapshot of active objectives and implementation state
+â”œâ”€â”€ DEVLOG.md                  # Comprehensive chronological log with architectural rationale
+â”œâ”€â”€ CLAUDE.md                  # Configuration pointer for Claude Code environments
+â”œâ”€â”€ .cursorrules               # Configuration pointer for Cursor environments
+â”œâ”€â”€ .cursor/rules/context.mdc  # Standardized Cursor Composer rule definition
+â”œâ”€â”€ .gitignore                 # Automatically configured exclusion for internal harness data
+â””â”€â”€ .offgit/
+    â”œâ”€â”€ prompt-log.jsonl       # Structured telemetry and reasoning logs (local-only)
+    â””â”€â”€ prompt-count           # Interval tracking counter
 ```
 
 ---
@@ -125,7 +125,7 @@ Created with and maintained with:
 - **Flash 3.7**
 - **Opus 4.6**
 - **Sonnet 5**
-- **Codex**
+- **Codex by GPT**
 - **Antigravity**
 
 ---
