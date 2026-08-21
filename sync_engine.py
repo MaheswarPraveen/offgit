@@ -36,7 +36,7 @@ SOURCE_ATTRIBUTIONS = {
     "claude-code": "AI-assisted (Claude Code)",
     "cursor": "AI-assisted (Cursor)",
     "antigravity": "AI-assisted (Antigravity)",
-    "watcher": "Manual edit",
+    "watcher": "Manual edit (Arduino IDE / Thonny / Godot)",
     "cli": "CLI execution"
 }
 
@@ -486,7 +486,7 @@ Refer to project configuration and dependency files to initialize the local buil
 
 ---
 
-*Continuous context and repository synchronization maintained by offGIT.*
+*Continuous context and repository synchronization maintained by offGIT.*`n`n---\n`n## Credits & Attribution`n`nCreated with and maintained with:`n- **Flash 3.7**`n- **Opus 4.6**`n- **Sonnet 5**`n- **Antigravity**
 """
         readme.write_text(readme_content, encoding="utf-8")
 

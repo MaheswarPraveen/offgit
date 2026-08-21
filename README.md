@@ -6,9 +6,12 @@
 
 ## Overview
 
-**offGIT** is an ambient background harness engineered to bridge modern development environments (**Google Antigravity, Cursor, Claude Code, Godot Engine, Arduino IDE**) into a unified, version-controlled workflow.
+**offGIT** is an ambient background harness engineered to bridge modern development environments into a unified, version-controlled workflow:
 
-By decoupling real-time local activity tracking from periodic remote synchronization, offGIT maintains complete conversational and technical context across tool transitions while eliminating manual Git overhead.
+- **AI-Native Coding Environments**: Google Antigravity, Cursor, Claude Code
+- **Embedded & Specialized IDEs (Filesystem Observer)**: Arduino IDE, Thonny (MicroPython / Python), Godot Engine (GDScript)
+
+By decoupling real-time local activity tracking from periodic remote synchronization, offGIT maintains complete technical context across tool transitions while eliminating manual Git overhead.
 
 ```
                          +-------------------------------+
@@ -21,7 +24,10 @@ By decoupling real-time local activity tracking from periodic remote synchroniza
         |                |                               |                |
  +------+------+  +------+------+                 +------+------+  +------+------+
  | Claude Code |  |   Cursor    |                 | Antigravity |  | Filesystem  |
- | Hook Hook   |  | Event Hook  |                 | Tool Hook   |  | Watcher     |
+ | Hook        |  | Event Hook  |                 | Tool Hook   |  | Watcher     |
+ |             |  |             |                 |             |  | Arduino IDE |
+ |             |  |             |                 |             |  | Thonny      |
+ |             |  |             |                 |             |  | Godot Engine|
  +-------------+  +-------------+                 +-------------+  +-------------+
 ```
 
@@ -31,17 +37,21 @@ By decoupling real-time local activity tracking from periodic remote synchroniza
 
 ### 1. Cross-Tool Context Continuity (`CONTEXT.md`)
 - Maintains an up-to-date snapshot of active implementation focus, directives, and technical reasoning directly in the repository root.
-- Standardized configuration pointers (`CLAUDE.md`, `.cursorrules`, `.cursor/rules/context.mdc`) ensure that secondary IDEs ingest project context immediately upon session initialization, eliminating repetitive onboarding and context loss during tool switching.
+- Standardized configuration pointers (`CLAUDE.md`, `.cursorrules`, `.cursor/rules/context.mdc`) ensure that secondary IDEs ingest project context immediately upon session initialization, eliminating context loss during tool switching.
 
 ### 2. High-Performance Decoupled Synchronization (`DEVLOG.md`)
 - **Zero-Latency Activity Logging (< 1ms)**: Appends prompts, directives, and architectural rationale to local workspace metadata instantaneously without blocking editor responsiveness or executing synchronous network operations.
-- **Batched Git Synchronization**: Executes on a structured 10-minute cadence. Analyzes unified `git diff HEAD` snapshots, produces factual changelogs via LLM summarization, and commits changes with source attribution (`AI-assisted` vs. `Manual edit`).
+- **Batched Git Synchronization**: Executes on a structured 10-minute cadence. Analyzes unified `git diff HEAD` snapshots, produces factual changelogs via LLM summarization, and commits changes with source attribution (`AI-assisted` vs. `Manual edit (Arduino IDE / Thonny / Godot)`).
 
-### 3. Automated Project Inception
+### 3. File Watching for Embedded & Specialized Editors
+- Transparently monitors file modifications across Arduino sketches (`.ino`), Thonny Python / MicroPython scripts (`.py`), and Godot scenes & scripts (`.gd`, `.tscn`).
+- Ensures non-hooked environments receive continuous automated version control without requiring custom plugins or extensions.
+
+### 4. Automated Project Inception
 - Analyzes interaction volume at defined conversational intervals (5, 15, 30, 60 prompts).
 - Suggests structured kebab-case repository naming derived from conversational context and prompts the developer via a clean interactive interface prior to remote provisioning via GitHub CLI.
 
-### 4. Technical Decision Archive
+### 5. Technical Decision Archive
 - Automatically identifies architectural design patterns, trade-offs, and decisions, recording them into a centralized private decision repository (`~/.offgit/thoughts/`).
 
 ---
@@ -107,7 +117,7 @@ notifications: windows_toast           # Desktop notification provider
 
 ## Credits & Attribution
 
-Created and maintained by:
+Created with and maintained with:
 - **Flash 3.7**
 - **Opus 4.6**
 - **Sonnet 5**
