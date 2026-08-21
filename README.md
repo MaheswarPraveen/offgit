@@ -1,6 +1,6 @@
 # offGIT
 
-> **An event-driven development harness that watches your project for changes and automatically invokes an LLM to understand those changes and maintain persistent project context and documentation.**
+> **offGIT is an agentic development harness that observes changes across your development environment and uses an LLM to understand, document, and preserve project context automatically.**
 
 ---
 
