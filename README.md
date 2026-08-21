@@ -1,6 +1,6 @@
-﻿# offGIT
+# offGIT
 
-**Ambient cross-environment development harness for continuous repository synchronization, context preservation, and automated technical documentation.**
+> **An event-driven development harness that watches your project for changes and automatically invokes an LLM to understand those changes and maintain persistent project context and documentation.**
 
 ---
 
