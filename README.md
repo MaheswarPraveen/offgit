@@ -1,4 +1,4 @@
-﻿# offGIT
+# offGIT
 
 **Ambient cross-environment development harness for continuous repository synchronization, context preservation, and automated technical documentation.**
 
@@ -127,4 +127,4 @@ Created with and maintained with:
 
 ## License
 
-MIT License
+GNU General Public License v3.0 (GPL-3.0)
