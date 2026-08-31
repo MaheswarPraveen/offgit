@@ -82,44 +82,29 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 
 ## Quick Start
 
-### Installation & Initialization
+### One-Click Automated Setup
+
+Double-click **`setup.bat`** (or execute via PowerShell):
 
 ```powershell
-python install_and_launch.py
+powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-The installer verifies system dependencies (`git`, `gh`, `node`, `claude`), installs required Python modules (`pyyaml`, `watchdog`), validates GitHub CLI authentication, registers Windows Task Scheduler autostart on logon, and initializes the background daemon.
+```
+===================================================
+         offGIT - One-Click Setup & Launch
+===================================================
 
-### Configuration (`~/.offgit/config.yaml`)
+[1/5] Verifying & Installing dependencies (git, gh, node via winget)...
+[2/5] Setting up Python environment & libraries (pyyaml, watchdog)...
+[3/5] Launching GitHub browser OAuth login (gh auth login)...
+[4/5] Installing global IDE integration rules across Antigravity, Claude, Cursor...
+[5/5] Registering background logon autostart and launching daemon...
 
-```yaml
-llm_tool: claude                       # "claude", "cursor-agent", or "codex" for automated summarization
-devlog_interval_seconds: 600           # Cadence for batched repository synchronization (10 min)
-context_push_debounce_seconds: 120     # Debounce threshold for context updates
-diff_char_limit: 8000                  # Maximum character limit for diff evaluation
-watched_extensions:                    # File patterns monitored by the filesystem observer
-  - .ino
-  - .gd
-  - .py
-  - .ts
-  - .cpp
-  - .h
-  - .js
-  - .c
-  - .hpp
-  - .tscn
-  - .md
-prompt_threshold:                      # Prompt intervals for repository inception checks
-  - 5
-  - 15
-  - 30
-  - 60
-thoughts_repo_path: ~/.offgit/thoughts # Path to private architectural decision repository
-notifications: windows_toast           # Desktop notification provider
+[SUCCESS] offGIT is authenticated, running, and ready!
 ```
 
 ---
-
 ## Credits & Attribution
 
 Created with and maintained with:
