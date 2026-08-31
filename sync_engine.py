@@ -39,6 +39,7 @@ SOURCE_ATTRIBUTIONS = {
     "cursor": "AI-assisted (Cursor)",
     "antigravity": "AI-assisted (Antigravity)",
     "codex": "AI-assisted (Codex)",
+    "opencode": "AI-assisted (OpenCode)",
     "watcher": "Manual edit (Arduino IDE / Thonny / Godot)",
     "cli": "CLI execution"
 }
@@ -143,7 +144,7 @@ def ensure_tool_pointers(repo_path: str) -> None:
     pointer_line = "See CONTEXT.md for current project state."
     r_path = Path(repo_path)
 
-    for doc_name in ["CLAUDE.md", "CODEX.md", ".cursorrules"]:
+    for doc_name in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", ".cursorrules"]:
         f_path = r_path / doc_name
         try:
             if f_path.exists():
@@ -568,8 +569,8 @@ def clean_prompt_summary(text: str) -> str:
     return cleaned
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
-    """Extracts un-synced thoughts with clean YYYY-MM-DD_<project>_<slug> naming and structured index table."""
-    if not prompt_context:
+    """Consolidates session prompts and diff into a single structured architectural note every batch interval (5-10m)."""
+    if not prompt_context and not diff:
         return
 
     try:
@@ -588,10 +589,12 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
                 except Exception:
                     last_sync_ts = ""
 
-        new_thoughts_count = 0
-        latest_processed_ts = last_sync_ts
         proj_name = Path(repo_path).name if repo_path else "general"
         proj_slug = "".join(c if c.isalnum() else "-" for c in proj_name.lower()).strip("-")
+
+        # Collect only new, meaningful entries since last sync
+        valid_entries = []
+        latest_processed_ts = last_sync_ts
 
         for entry in prompt_context:
             entry_ts = entry.get("ts", "")
@@ -606,79 +609,112 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
             if not summary or len(summary) < 8 or summary.lower() in ["hi", "hello", "hey", "cool", "yes", "no", "ok", "okay"]:
                 continue
 
-            # Generate memorable 3-5 word slug
-            words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:5]
-            topic_slug = "-".join(words) or "technical-decision"
-
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            time_str = datetime.now().strftime("%H:%M")
-            filename = f"{date_str}_{proj_slug}_{topic_slug}.md"
-            file_path = thoughts_repo / filename
-
-            title_text = summary[:70] + ("..." if len(summary) > 70 else "")
-
-            content = f"# Architecture Decision: {title_text}\n\n"
-            content += f"- **Date**: `{date_str} {time_str}`\n"
-            content += f"- **Project**: `{proj_name}`\n"
-            content += f"- **Tool**: `{entry_tool}`\n\n"
-            content += "---\n\n"
-            content += f"## Problem & Directive\n\n{summary}\n\n"
-            if thinking:
-                content += f"## AI Architectural Reasoning\n\n{thinking}\n\n"
-            if diff:
-                content += f"## Accompanying Code Diff\n\n```diff\n{diff[:2000]}\n```\n"
-
-            file_path.write_text(strip_emojis(content), encoding="utf-8")
-            new_thoughts_count += 1
+            valid_entries.append({
+                "ts": entry_ts,
+                "tool": entry_tool,
+                "summary": summary,
+                "thinking": thinking
+            })
             if entry_ts > latest_processed_ts:
                 latest_processed_ts = entry_ts
 
-        if new_thoughts_count > 0:
-            # Build structured chronological table
-            readme_path = thoughts_repo / "README.md"
-            all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
-            table_rows = []
+        # If no new chat prompts, ingest active state from CONTEXT.md
+        if not valid_entries:
+            active_focus = "Ongoing project development and maintenance"
+            if repo_path:
+                ctx_file = Path(repo_path) / "CONTEXT.md"
+                if ctx_file.exists():
+                    try:
+                        for line in ctx_file.read_text(encoding="utf-8").splitlines():
+                            if line.startswith("- Directive:"):
+                                active_focus = line.replace("- Directive:", "").strip()
+                                break
+                    except Exception:
+                        pass
 
-            for md in all_mds:
-                if md.name == "README.md":
-                    continue
-                # Parse filename format: YYYY-MM-DD_project_topic.md or legacy format
-                parts = md.stem.split("_")
-                if len(parts) >= 3:
-                    d_str = parts[0]
-                    p_str = parts[1]
-                    t_str = " ".join(parts[2:]).replace("-", " ").capitalize()
-                else:
-                    d_str = md.stem[:10] if len(md.stem) >= 10 else "â€”"
-                    p_str = proj_slug
-                    t_str = md.stem[11:].replace("-", " ").capitalize() if len(md.stem) > 11 else md.stem
+            valid_entries.append({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "tool": trigger_source if 'trigger_source' in locals() else tool,
+                "summary": active_focus,
+                "thinking": "Automated 5-minute periodic sync checkpoint"
+            })
 
-                table_rows.append(f"| `{d_str}` | `{p_str}` | **{t_str}** | [`View Note`](./{md.name}) |")
+        # Derive overarching session topic from most substantial entry
+        primary_entry = valid_entries[-1]
+        primary_summary = primary_entry["summary"]
+        words = "".join(c if c.isalnum() else " " for c in primary_summary.lower()).split()[:5]
+        topic_slug = "-".join(words) or "periodic-checkpoint"
 
-            table_content = "| Date | Project | Topic / Decision | Note Link |\n| :--- | :--- | :--- | :--- |\n" + "\n".join(table_rows)
-            start_marker = "<!-- OFFGIT_DECISIONS_START -->"
-            end_marker = "<!-- OFFGIT_DECISIONS_END -->"
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        time_str = datetime.now().strftime("%H:%M")
+        time_compact = datetime.now().strftime("%H%M")
+        filename = f"{date_str}_{proj_slug}_{time_compact}_{topic_slug}.md"
+        file_path = thoughts_repo / filename
 
-            header_text = "# Private Technical Thoughts & Architecture Corpus\n\nChronological decision log and architectural reasoning maintained automatically by **offGIT**.\n\n---\n\n## Decision Index\n\n"
-            new_readme = f"{header_text}{start_marker}\n{table_content}\n{end_marker}\n"
-            readme_path.write_text(new_readme, encoding="utf-8")
+        # Construct single consolidated session document
+        title_text = primary_summary[:80] + ("..." if len(primary_summary) > 80 else "")
+        content = f"# Technical Session: {title_text}\n\n"
+        content += f"- **Date / Time**: `{date_str} {time_str}`\n"
+        content += f"- **Project**: `{proj_name}`\n"
+        content += f"- **Batched Directives**: `{len(valid_entries)} prompt(s) / checkpoint(s) processed`\n\n"
+        content += "---\n\n"
 
-            # Stage, commit, and push thoughts
-            run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
-            commit_msg = f"docs(thoughts): record {new_thoughts_count} decisions ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-            run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
+        content += "## 1. Directives & Ingested Context\n\n"
+        for i, ve in enumerate(valid_entries, 1):
+            content += f"### Directive {i} (`{ve['tool']}`)\n"
+            content += f"**Prompt**: {ve['summary']}\n\n"
+            if ve['thinking']:
+                content += f"**Architectural Rationale**:\n> {ve['thinking']}\n\n"
 
-            code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
-            if code_r == 0 and remote_out.strip():
-                pull_code, _, _ = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
-                if pull_code != 0:
-                    run_cmd(["git", "rebase", "--abort"], cwd=str(thoughts_repo), timeout=10)
-                    return
-                run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
-                logger.info(f"Auto-synced {new_thoughts_count} thoughts to private thoughts repo with structured table.")
+        if diff:
+            content += "## 2. Accompanying Code Changes\n\n"
+            content += f"```diff\n{diff[:3000]}\n```\n"
 
-            if ts_file and latest_processed_ts:
-                ts_file.write_text(latest_processed_ts, encoding="utf-8")
+        file_path.write_text(strip_emojis(content), encoding="utf-8")
+
+        # Rebuild structured chronological index table
+        readme_path = thoughts_repo / "README.md"
+        all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
+        table_rows = []
+
+        for md in all_mds:
+            if md.name == "README.md":
+                continue
+            parts = md.stem.split("_")
+            if len(parts) >= 3:
+                d_str = parts[0]
+                p_str = parts[1]
+                t_str = " ".join(parts[2:]).replace("-", " ").capitalize()
+            else:
+                d_str = md.stem[:10] if len(md.stem) >= 10 else "-"
+                p_str = proj_slug
+                t_str = md.stem[11:].replace("-", " ").capitalize() if len(md.stem) > 11 else md.stem
+
+            table_rows.append(f"| `{d_str}` | `{p_str}` | **{t_str}** | [`View Note`](./{md.name}) |")
+
+        table_content = "| Date | Project | Topic / Decision | Note Link |\n| :--- | :--- | :--- | :--- |\n" + "\n".join(table_rows)
+        start_marker = "<!-- OFFGIT_DECISIONS_START -->"
+        end_marker = "<!-- OFFGIT_DECISIONS_END -->"
+        header_text = "# Private Technical Thoughts & Architecture Corpus\n\nChronological decision log and architectural reasoning maintained automatically by **offGIT**.\n\n---\n\n## Decision Index\n\n"
+        new_readme = f"{header_text}{start_marker}\n{table_content}\n{end_marker}\n"
+        readme_path.write_text(new_readme, encoding="utf-8")
+
+        # Commit and push
+        run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
+        commit_msg = f"docs(thoughts): record session summary for {proj_name} ({date_str} {time_str})"
+        run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
+
+        code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
+        if code_r == 0 and remote_out.strip():
+            pull_code, _, _ = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
+            if pull_code != 0:
+                run_cmd(["git", "rebase", "--abort"], cwd=str(thoughts_repo), timeout=10)
+                return
+            run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
+            logger.info(f"Auto-synced session thought to private thoughts repo.")
+
+        if ts_file and latest_processed_ts:
+            ts_file.write_text(latest_processed_ts, encoding="utf-8")
 
     except Exception as e:
         logger.error(f"Error in classify_thought: {e}", exc_info=True)

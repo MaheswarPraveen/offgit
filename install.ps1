@@ -103,6 +103,11 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 [System.IO.File]::WriteAllText("$scratchDir\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$scratchDir\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 
+# OpenCode Global Rule
+$opencodeConfig = "$env:USERPROFILE\.config\opencode"
+New-Item -ItemType Directory -Path $opencodeConfig -Force | Out-Null
+[System.IO.File]::WriteAllText("$opencodeConfig\OPENCODE.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
+
 # 6. Windows Startup Registration & Silent Background Launch via WMI
 Write-Host "`n[5/5] Registering silent autostart on logon and launching daemon..." -ForegroundColor Yellow
 $startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)

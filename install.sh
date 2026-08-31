@@ -95,7 +95,7 @@ echo "[5/6] Injecting global IDE rules (Antigravity, Claude, Cursor, Codex)..."
 
 GEMINI_DIR="$HOME/.gemini/config"
 SCRATCH_DIR="$HOME/.gemini/antigravity/scratch"
-mkdir -p "$GEMINI_DIR/rules" "$SCRATCH_DIR" "$HOME/.claude" "$HOME/.cursor"
+mkdir -p "$GEMINI_DIR/rules" "$SCRATCH_DIR" "$HOME/.claude" "$HOME/.cursor" "$HOME/.config/opencode"
 
 RULE_TEXT="# offGIT Global Integration Rule
 
@@ -127,6 +127,7 @@ echo "$RULE_TEXT" > "$GEMINI_DIR/AGENTS.md"
 echo "$RULE_TEXT" > "$GEMINI_DIR/rules/offgit.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/GEMINI.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/AGENTS.md"
+echo "$RULE_TEXT" > "$HOME/.config/opencode/OPENCODE.md"
 
 if [ ! -f "$HOME/.claude/settings.json" ]; then
     cat << 'EOF' > "$HOME/.claude/settings.json"

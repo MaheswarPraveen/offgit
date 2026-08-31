@@ -8,7 +8,7 @@
 
 offGIT runs as a lightweight ambient process that unifies modern AI coding tools and embedded editors into a cohesive, automated workflow:
 
-- **AI-Native Environments**: Google Antigravity, Cursor, Claude Code, OpenAI Codex
+- **AI-Native Environments**: Google Antigravity, Cursor, Claude Code, OpenAI Codex, OpenCode
 - **Embedded & Specialized Editors**: Arduino IDE, Thonny, Godot Engine
 
 By decoupling real-time local activity tracking (< 1ms) from periodic remote synchronization (10-minute cadence), offGIT preserves technical reasoning without introducing editor latency or manual Git overhead.
@@ -79,7 +79,7 @@ The one-line installer handles all setup automatically:
 1. Resolves system dependencies (`git`, `gh`, `python3`).
 2. Validates GitHub authentication (`gh auth login --web` if unauthenticated).
 3. Installs runtime libraries (`pyyaml`, `watchdog`).
-4. Deploys global AI integration rules (`Antigravity`, `Claude Code`, `Cursor`, `Codex`).
+4. Deploys global AI integration rules (`Antigravity`, `Claude Code`, `Cursor`, `Codex`, `OpenCode`).
 5. Initializes the private `thoughts` decision repository.
 6. Registers and starts the background daemon (`Windows Startup VBS`, `macOS LaunchAgent`, or `Linux systemd`).
 
@@ -150,6 +150,7 @@ watched_extensions:
 |-- DEVLOG.md                  # Chronological changelog with tool attribution
 |-- CLAUDE.md                  # Context pointer for Claude Code
 |-- CODEX.md                   # Context pointer for Codex CLI
+|-- OPENCODE.md                # Context pointer for OpenCode
 |-- .cursorrules               # Context pointer for Cursor
 |-- .cursor/rules/context.mdc  # Context pointer for Cursor Composer
 |-- .gitignore                 # Exclusion rules for local metadata
