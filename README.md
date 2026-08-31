@@ -57,74 +57,47 @@ For environments that lack native AI extension APIs, offGIT provides automated G
 
 ---
 
-## Installation Guide
+## One-Click Installation
 
-### Prerequisites
-Before installing offGIT, ensure your machine meets the following requirements:
-1. **Git**: Installed and available in your system `PATH` (`git --version`).
-2. **GitHub CLI (`gh`)**: Installed (`gh --version`).
-3. **Python 3.10+**: Installed with `pip` (`python --version`).
-4. **GitHub Account**: Logged in via `gh auth login`.
+offGIT provides automated **one-click / one-line installation** across Windows, macOS, and Linux:
 
----
+### 1. Windows (One-Click)
 
-### Option A: One-Click Automated Setup (Windows)
-
-#### Step 1: Clone or Download the Repository
-```powershell
-git clone https://github.com/MaheswarPraveen/offgit.git
-cd offgit
-```
-
-#### Step 2: Run the One-Click Installer
-You can either double-click **`setup.bat`** in File Explorer, or run PowerShell as Administrator/User:
+Double-click **`setup.bat`** (or execute via PowerShell):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-**What the installer does automatically:**
-1. Verifies prerequisites (installs `git`, `gh`, `python` via `winget` if missing).
-2. Authenticates GitHub CLI (launches `gh auth login --web` in your browser if not logged in).
-3. Installs required Python libraries (`pyyaml`, `watchdog`).
-4. Deploys offGIT harness scripts to `~/.offgit/`.
-5. Injects global rules for **Google Antigravity**, **Claude Code**, **Cursor**, and **OpenAI Codex**.
-6. Creates and initializes your private `thoughts` repository.
-7. Registers a silent background startup service in `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\offGIT.vbs` and launches the daemon.
-
 ---
 
-### Option B: Manual Cross-Platform Installation (macOS & Linux)
+### 2. macOS & Linux (One-Line)
 
-#### Step 1: Clone Repository & Create Harness Directory
+Run the automated installer script:
+
 ```bash
-git clone https://github.com/MaheswarPraveen/offgit.git
-mkdir -p ~/.offgit/logs ~/.offgit/thoughts
-cp -r offgit/* ~/.offgit/
+curl -fsSL https://raw.githubusercontent.com/MaheswarPraveen/offgit/main/install.sh | bash
 ```
 
-#### Step 2: Install Python Dependencies
+Or from a local clone:
 ```bash
-pip install pyyaml watchdog
-```
-
-#### Step 3: Authenticate GitHub CLI
-```bash
-gh auth login --web
-```
-
-#### Step 4: Verify and Start the Background Daemon
-```bash
-# Verify installation & health
-python3 ~/.offgit/sync_engine.py --fix
-
-# Start background daemon in background
-nohup python3 ~/.offgit/watcher.py > ~/.offgit/logs/engine.log 2>&1 &
+chmod +x install.sh && ./install.sh
 ```
 
 ---
 
-## Post-Install Verification & Self-Healing
+### What the One-Click Installer Automates:
+
+1. **Dependency Resolution**: Automatically installs missing tools (`git`, `gh`, `python3`) via `winget` (Windows), `brew` (macOS), `apt` (Debian/Ubuntu), `dnf` (Fedora), or `pacman` (Arch).
+2. **Browser OAuth Login**: Verifies `gh auth status` and opens browser authentication if needed.
+3. **Python Libraries**: Installs required runtime packages (`pyyaml`, `watchdog`).
+4. **Global Rule Injection**: Deploys offGIT harness instructions for Antigravity, Claude Code, Cursor, and Codex.
+5. **Private Thoughts Repository**: Creates and initializes your private `thoughts` GitHub repository.
+6. **Autostart Service**: Registers a background startup service (**Windows Startup VBS**, **macOS LaunchAgent**, or **Linux systemd service**) and starts the watcher daemon silently.
+
+---
+
+## Verification & Self-Healing Diagnostics
 
 To verify that offGIT is active and healthy, or to perform self-healing diagnostics:
 
@@ -207,7 +180,7 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 - **Divergence Prevention**: Auto-runs `git pull --rebase --autostash` before pushing. If a merge conflict occurs, it executes `git rebase --abort` immediately to restore a clean local state.
 - **Private by Default**: New repositories and the private `thoughts` repository scaffold as **private** by default.
 - **Non-Destructive Pointer Injection**: AI editor rules (`CLAUDE.md`, `.cursorrules`, `CODEX.md`) and index tables in `thoughts/README.md` are updated non-destructively using HTML comment markers (`<!-- OFFGIT_DECISIONS_START -->`).
-- **Cross-Platform OS Architecture**: Native notification adapters and process management across **Windows** (Toast / VBS Startup launcher), **macOS** (osascript / launchd), and **Linux** (notify-send / systemd).
+- **Cross-Platform OS Architecture**: Native notification adapters and process management across **Windows** (Toast / VBS Startup launcher), **macOS** (osascript / LaunchAgent), and **Linux** (notify-send / systemd).
 
 ---
 
