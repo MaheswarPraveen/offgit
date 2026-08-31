@@ -544,102 +544,125 @@ Historical architectural decisions and technical trade-offs are documented conti
         return False
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
-    """Simultaneously extracts all un-synced brainstorming thoughts and architecture decisions into the thoughts repository."""
+    """Extracts un-synced thoughts with isolated rebase protection and marker-based README preservation."""
     if not prompt_context:
         return
 
-    thoughts_repo = Path(CONFIG.get("thoughts_repo_path", THOUGHTS_DIR))
-    if not (thoughts_repo / ".git").exists():
-        logger.debug(f"Thoughts repository at {thoughts_repo} is not a git repository. Skipping thought sync.")
-        return
+    try:
+        thoughts_repo = Path(CONFIG.get("thoughts_repo_path", THOUGHTS_DIR))
+        if not (thoughts_repo / ".git").exists():
+            logger.debug(f"Thoughts repository at {thoughts_repo} is not a git repository. Initializing local thoughts repository...")
+            run_cmd(["git", "init"], cwd=str(thoughts_repo), timeout=5)
+            run_cmd(["git", "branch", "-M", "main"], cwd=str(thoughts_repo), timeout=5)
 
-    # Check last-synced timestamp to avoid re-syncing duplicate thoughts
-    ts_file = None
-    last_sync_ts = ""
-    if repo_path:
-        ts_file = Path(repo_path) / ".offgit" / "last-thought-sync.ts"
-        if ts_file.exists():
-            try:
-                last_sync_ts = ts_file.read_text(encoding="utf-8").strip()
-            except Exception:
-                last_sync_ts = ""
-
-    new_thoughts_count = 0
-    latest_processed_ts = last_sync_ts
-
-    for entry in prompt_context:
-        entry_ts = entry.get("ts", "")
-        if last_sync_ts and entry_ts <= last_sync_ts:
-            continue
-
-        summary = entry.get("summary", "").strip()
-        thinking = entry.get("ai_thinking", "").strip()
-        entry_tool = entry.get("tool", tool)
-
-        # Filter out trivial greetings (< 8 chars or common short phrases)
-        if not summary or len(summary) < 8 or summary.lower() in ["hi", "hello", "hey", "cool", "yes", "no", "ok", "okay"]:
-            continue
-
-        # Sanitize slug
-        slug = "".join(c if c.isalnum() else "-" for c in summary.lower())[:45].strip("-")
-        if not slug:
-            continue
-
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        filename = f"{date_str}-{slug}.md"
-        file_path = thoughts_repo / filename
-
-        content = f"# Technical Thought & Architecture Decision: {summary}\n\n"
-        content += f"**Date:** {date_str}  \n"
-        content += f"**Tool:** {entry_tool}  \n"
+        # Check last-synced timestamp to avoid re-syncing duplicate thoughts
+        ts_file = None
+        last_sync_ts = ""
         if repo_path:
-            content += f"**Project:** `{Path(repo_path).name}`  \n\n"
-        else:
-            content += "\n"
+            ts_file = Path(repo_path) / ".offgit" / "last-thought-sync.ts"
+            if ts_file.exists():
+                try:
+                    last_sync_ts = ts_file.read_text(encoding="utf-8").strip()
+                except Exception:
+                    last_sync_ts = ""
 
-        content += f"## Problem & Directive\n\n{summary}\n\n"
-        if thinking:
-            content += f"## AI Architectural Reasoning\n\n{thinking}\n\n"
-        if diff:
-            content += f"## Accompanying Diff Summary\n\n```diff\n{diff[:2000]}\n```\n"
+        new_thoughts_count = 0
+        latest_processed_ts = last_sync_ts
 
-        file_path.write_text(strip_emojis(content), encoding="utf-8")
-        new_thoughts_count += 1
-        if entry_ts > latest_processed_ts:
-            latest_processed_ts = entry_ts
+        # Deterministic ingestion: zero LLM dependency to ensure zero dropped thoughts
+        for entry in prompt_context:
+            entry_ts = entry.get("ts", "")
+            if last_sync_ts and entry_ts <= last_sync_ts:
+                continue
 
-    if new_thoughts_count > 0:
-        # Update README index
-        readme_path = thoughts_repo / "README.md"
-        all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
-        readme_lines = [
-            "# Private Technical Thoughts & Decision Corpus\n",
-            "Private repository of architecture decisions and developer reasoning maintained by offGIT.\n",
-            "## Recent Decisions\n"
-        ]
-        for md in all_mds:
-            if md.name != "README.md":
-                title = md.stem.replace("-", " ").capitalize()
-                readme_lines.append(f"- [{title}]({md.name})")
+            summary = entry.get("summary", "").strip()
+            thinking = entry.get("ai_thinking", "").strip()
+            entry_tool = entry.get("tool", tool)
 
-        readme_path.write_text("\n".join(readme_lines) + "\n", encoding="utf-8")
+            # Filter out trivial conversational greetings
+            if not summary or len(summary) < 8 or summary.lower() in ["hi", "hello", "hey", "cool", "yes", "no", "ok", "okay"]:
+                continue
 
-        # Stage, commit, and push thoughts
-        run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
-        commit_msg = f"docs(thoughts): sync {new_thoughts_count} decision records"
-        run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
+            slug = "".join(c if c.isalnum() else "-" for c in summary.lower())[:45].strip("-")
+            if not slug:
+                continue
 
-        code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
-        if code_r == 0 and remote_out.strip():
-            run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
-            code_p, _, err_p = run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
-            if code_p == 0:
-                logger.info(f"Auto-synced {new_thoughts_count} thoughts to private thoughts repository.")
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            filename = f"{date_str}-{slug}.md"
+            file_path = thoughts_repo / filename
+
+            content = f"# Technical Thought & Architecture Decision: {summary}\n\n"
+            content += f"**Date:** {date_str}  \n"
+            content += f"**Tool:** {entry_tool}  \n"
+            if repo_path:
+                content += f"**Project:** `{Path(repo_path).name}`  \n\n"
             else:
-                logger.warning(f"Could not push thoughts to remote repository: {err_p}")
+                content += "\n"
 
-        if ts_file and latest_processed_ts:
-            ts_file.write_text(latest_processed_ts, encoding="utf-8")
+            content += f"## Problem & Directive\n\n{summary}\n\n"
+            if thinking:
+                content += f"## AI Architectural Reasoning\n\n{thinking}\n\n"
+            if diff:
+                content += f"## Accompanying Diff Summary\n\n```diff\n{diff[:2000]}\n```\n"
+
+            file_path.write_text(strip_emojis(content), encoding="utf-8")
+            new_thoughts_count += 1
+            if entry_ts > latest_processed_ts:
+                latest_processed_ts = entry_ts
+
+        if new_thoughts_count > 0:
+            # Marker-based non-destructive README index update
+            readme_path = thoughts_repo / "README.md"
+            all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
+            decision_links = []
+            for md in all_mds:
+                if md.name != "README.md":
+                    title = md.stem.replace("-", " ").capitalize()
+                    decision_links.append(f"- [{title}]({md.name})")
+
+            decisions_block = "\n".join(decision_links)
+            start_marker = "<!-- OFFGIT_DECISIONS_START -->"
+            end_marker = "<!-- OFFGIT_DECISIONS_END -->"
+
+            if readme_path.exists():
+                existing_readme = readme_path.read_text(encoding="utf-8")
+                if start_marker in existing_readme and end_marker in existing_readme:
+                    pre = existing_readme.split(start_marker)[0]
+                    post = existing_readme.split(end_marker)[1]
+                    new_readme = f"{pre}{start_marker}\n{decisions_block}\n{end_marker}{post}"
+                else:
+                    new_readme = f"{existing_readme.rstrip()}\n\n## Recent Architecture Decisions\n{start_marker}\n{decisions_block}\n{end_marker}\n"
+            else:
+                new_readme = f"# Private Technical Thoughts & Decision Corpus\n\nPrivate repository of architecture decisions and developer reasoning maintained by offGIT.\n\n## Recent Decisions\n{start_marker}\n{decisions_block}\n{end_marker}\n"
+
+            readme_path.write_text(new_readme, encoding="utf-8")
+
+            # Stage, commit, and push thoughts with independent rebase protection
+            run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
+            commit_msg = f"docs(thoughts): sync {new_thoughts_count} decision records"
+            run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
+
+            code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
+            if code_r == 0 and remote_out.strip():
+                # Pull with rebase & autostash first
+                pull_code, _, pull_err = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
+                if pull_code != 0:
+                    logger.warning(f"git pull --rebase on thoughts repo encountered a conflict: {pull_err}")
+                    run_cmd(["git", "rebase", "--abort"], cwd=str(thoughts_repo), timeout=10)
+                    logger.info("Aborted thoughts rebase to keep local decision records intact. Skipping push for this cycle.")
+                    return
+
+                code_p, _, err_p = run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
+                if code_p == 0:
+                    logger.info(f"Auto-synced {new_thoughts_count} thoughts to private thoughts repository.")
+                else:
+                    logger.warning(f"Could not push thoughts to remote repository: {err_p}")
+
+            if ts_file and latest_processed_ts:
+                ts_file.write_text(latest_processed_ts, encoding="utf-8")
+
+    except Exception as e:
+        logger.error(f"Error in classify_thought: {e}", exc_info=True)
 
 def notify(title: str, message: str) -> None:
     """Cross-platform notification provider supporting Windows, macOS, and Linux without console popups."""
