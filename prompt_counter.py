@@ -2,49 +2,73 @@ import os
 import sys
 import json
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path.home() / ".offgit"))
-from sync_engine import (
-    CONFIG,
-    append_prompt_log,
-    update_context_md,
-    should_trigger_repo_check,
-    suggest_repo_name,
-    phrase_repo_question,
-    read_prompt_log,
-    logger
-)
+MILESTONES = {5, 15, 30, 60}
 
 def main():
-    parser = argparse.ArgumentParser(description="offGIT In-Chat Fast Prompt Logger")
-    parser.add_argument("--repo", type=str, required=True, help="Repository directory")
-    parser.add_argument("--prompt", type=str, default="", help="Prompt text")
-    parser.add_argument("--tool", type=str, default="claude-code", help="Tool name")
-    parser.add_argument("--thinking", type=str, default="", help="AI thinking")
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", type=str, required=True)
+    parser.add_argument("--prompt", type=str, default="")
+    parser.add_argument("--tool", type=str, default="antigravity")
+    parser.add_argument("--thinking", type=str, default="")
     args = parser.parse_args()
-    repo_path = Path(args.repo).resolve()
 
-    if not repo_path.exists():
-        repo_path.mkdir(parents=True, exist_ok=True)
+    repo = Path(args.repo).resolve()
+    off_dir = repo / ".offgit"
+    off_dir.mkdir(parents=True, exist_ok=True)
 
-    summary = args.prompt.strip() or f"User prompt in {args.tool}"
+    summary = (args.prompt.strip() or f"User prompt in {args.tool}").encode("ascii", "ignore").decode("ascii")
+    thinking = args.thinking.strip().encode("ascii", "ignore").decode("ascii")
 
-    # 1. Fast local log append (<1ms, no git, no network)
-    count = append_prompt_log(str(repo_path), args.tool, summary, args.thinking)
+    # 1. Update count
+    count_file = off_dir / "prompt-count"
+    count = 0
+    if count_file.exists():
+        try:
+            count = int(count_file.read_text(encoding="utf-8").strip())
+        except ValueError:
+            count = 0
+    count += 1
+    count_file.write_text(str(count), encoding="utf-8")
 
-    # 2. Fast local CONTEXT.md snapshot update (local-only)
-    update_context_md(str(repo_path), f"- Active Directive: {summary}")
+    # 2. Append to log
+    log_file = off_dir / "prompt-log.jsonl"
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "tool": args.tool,
+        "summary": summary,
+        "ai_thinking": thinking
+    }
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
 
-    # 3. Check milestone threshold for in-chat repo inception
-    if should_trigger_repo_check(count):
-        prompts = read_prompt_log(str(repo_path))
-        sug_name = suggest_repo_name(prompts, repo_path.name, args.tool)
-        question = phrase_repo_question(prompts, sug_name, args.tool)
-        print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: {question}")
+    # 3. Update CONTEXT.md (instant local snapshot)
+    context_file = repo / "CONTEXT.md"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    md = [
+        f"# Live Project Context: {repo.name}",
+        f"\n**Last Synced:** {now_str}",
+        "\n## Current Focus & Active State\n",
+        f"- Directive: {summary}"
+    ]
+    if thinking:
+        md.append(f"- Rationale: {thinking}")
+    md.extend([
+        "\n## Open Decisions & Next Steps\n",
+        "- Continue active implementation according to current focus.",
+        "- Refer to DEVLOG.md for historical architecture decisions.\n"
+    ])
+    context_file.write_text("\n".join(md), encoding="utf-8")
+
+    # 4. Check milestone
+    if count in MILESTONES:
+        words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
+        sug_name = "-".join(words) or repo.name.lower()
+        print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
     else:
-        print(f"[offGIT] Logged prompt #{count} for '{repo_path.name}'.")
+        print(f"[offGIT] Logged prompt #{count} for '{repo.name}'.")
 
 if __name__ == "__main__":
     main()
