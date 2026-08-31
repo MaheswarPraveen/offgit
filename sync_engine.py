@@ -31,11 +31,19 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger("offGIT")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    fh = logging.FileHandler(str(LOG_FILE), encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
 SOURCE_ATTRIBUTIONS = {
     "claude-code": "AI-assisted (Claude Code)",
     "cursor": "AI-assisted (Cursor)",
-    "antigravity": "AI-assisted (Antigravity)",`r`n    "codex": "AI-assisted (Codex)",
+    "antigravity": "AI-assisted (Antigravity)",
+    "codex": "AI-assisted (Codex)",
     "watcher": "Manual edit (Arduino IDE / Thonny / Godot)",
     "cli": "CLI execution"
 }
@@ -110,7 +118,7 @@ def ensure_tool_pointers(repo_path: str) -> None:
     pointer_line = "See CONTEXT.md for current project state."
     r_path = Path(repo_path)
 
-        claude_md = r_path / "CLAUDE.md"
+    claude_md = r_path / "CLAUDE.md"
     try:
         if claude_md.exists():
             c = claude_md.read_text(encoding="utf-8")
@@ -130,7 +138,9 @@ def ensure_tool_pointers(repo_path: str) -> None:
         else:
             codex_md.write_text(f"{pointer_line}\n", encoding="utf-8")
     except Exception as e:
-        logger.debug(f"Could not write CODEX.md in {repo_path}: {e}")cursor_rules_dir = r_path / ".cursor" / "rules"
+        logger.debug(f"Could not write CODEX.md in {repo_path}: {e}")
+
+    cursor_rules_dir = r_path / ".cursor" / "rules"
     cursor_rules_dir.mkdir(parents=True, exist_ok=True)
     cursor_mdc = cursor_rules_dir / "context.mdc"
     try:
@@ -549,7 +559,9 @@ Historical architectural decisions and technical trade-offs are documented conti
     else:
         logger.error(f"gh repo create failed: {err}")
 
-    return Falsedef classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
+    return False
+
+def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     if not prompt_context and not diff:
         return
 
