@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Continue"
 
 Write-Host "===================================================" -ForegroundColor Cyan
 Write-Host "         offGIT - One-Click Setup & Launch         " -ForegroundColor Cyan
@@ -17,7 +17,6 @@ function Ensure-Package($cmd, $id, $label) {
 
 Ensure-Package "git" "Git.Git" "Git"
 Ensure-Package "gh" "GitHub.cli" "GitHub CLI"
-Ensure-Package "node" "OpenJS.NodeJS.LTS" "Node.js"
 
 # 2. Refresh Environment Path
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -33,9 +32,24 @@ if (-not $py) {
 
 $offgitHome = "$env:USERPROFILE\.offgit"
 New-Item -ItemType Directory -Path $offgitHome, "$offgitHome\logs", "$offgitHome\thoughts" -Force | Out-Null
-Copy-Item "$PSScriptRoot\*" $offgitHome -Recurse -Force -ErrorAction SilentlyContinue
 
-pip install pyyaml watchdog -q
+# Handle local execution vs remote irm | iex execution
+if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "sync_engine.py"))) {
+    Write-Host "Deploying files from local clone..." -ForegroundColor Yellow
+    Get-ChildItem -Path $PSScriptRoot -File | ForEach-Object {
+        Copy-Item $_.FullName -Destination $offgitHome -Force
+    }
+} else {
+    Write-Host "Downloading latest offGIT harness files from GitHub..." -ForegroundColor Yellow
+    $rawBase = "https://raw.githubusercontent.com/MaheswarPraveen/offgit/main"
+    $files = @("sync_engine.py", "prompt_counter.py", "watcher.py", "debounce_trigger.py", "config.yaml", "FIXES.md", "README.md")
+    foreach ($f in $files) {
+        Invoke-WebRequest -Uri "$rawBase/$f" -OutFile "$offgitHome\$f" -UseBasicParsing
+    }
+}
+
+# Install Python runtime libraries
+python -m pip install pyyaml watchdog --quiet
 
 # 4. GitHub Authentication Gate (Interactive Web Flow)
 Write-Host "`n[3/5] Verifying GitHub authentication..." -ForegroundColor Yellow
@@ -72,9 +86,12 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
    - This keeps `CONTEXT.md` updated in real-time (< 1ms) and increments the milestone counter.
 
 4. **In-Chat Milestone Inception (Prompts 5, 15, 30, 60)**:
-   - When `prompt_counter.py` returns `[offGIT MILESTONE <count>]`, proactively ask the user directly in your chat response using the question and suggested name (e.g. *"Looks like we've reached milestone 5 for this project — want me to create and scaffold a GitHub repository for `<suggested-name>`?"*).
+   - When `prompt_counter.py` returns `[offGIT MILESTONE <count>]`, proactively ask the user directly in your chat response using the question and suggested name.
    - When the user confirms or gives a custom name, execute:
      `python "$env:USERPROFILE\.offgit\sync_engine.py" --repo "<project_directory>" --scaffold --name "<confirmed_name>"`
+
+5. **Token-Efficient Self-Healing & Error Reference (FIXES.md)**:
+   - When diagnosing errors or debugging offGIT behavior, consult `~/.offgit/FIXES.md` (or run `python "$env:USERPROFILE\.offgit\sync_engine.py" --fix`) first before performing broad search to achieve 1-shot fixes with minimal token usage.
 "@
 
 [System.IO.File]::WriteAllText("$geminiConfig\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
@@ -83,9 +100,13 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 [System.IO.File]::WriteAllText("$scratchDir\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$scratchDir\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 
-# 6. Windows Startup Registration & Background Launch
+# 6. Windows Startup Registration & Silent Background Launch via WMI
 Write-Host "`n[5/5] Registering silent autostart on logon and launching daemon..." -ForegroundColor Yellow
-$startupFolder = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+$appData = if ($env:APPDATA) { $env:APPDATA } else { "$env:USERPROFILE\AppData\Roaming" }
+$startupFolder = "$appData\Microsoft\Windows\Start Menu\Programs\Startup"
+if (-not (Test-Path $startupFolder)) {
+    New-Item -ItemType Directory -Path $startupFolder -Force | Out-Null
+}
 $startupVbs = "$startupFolder\offGIT.vbs"
 
 $pythonExe = (Get-Command python).Source
@@ -93,23 +114,24 @@ $pythonDir = Split-Path $pythonExe
 $pythonw = Join-Path $pythonDir "pythonw.exe"
 if (-not (Test-Path $pythonw)) { $pythonw = $pythonExe }
 
-$watcherScript = "$offgitHome\watcher.py"
-
 $vbsContent = @"
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """$pythonw"" ""$watcherScript""", 0, False
+Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+Set objProcess = objWMIService.Get("Win32_Process")
+intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py""", Null, Null, intProcessID)
 "@
 
 [System.IO.File]::WriteAllText($startupVbs, $vbsContent, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$offgitHome\start_offgit.vbs", $vbsContent, [System.Text.UTF8Encoding]::new($false))
 
-# Kill any previous instance and start fresh
+# Kill previous instance and start clean detached daemon
 Get-Process -Name pythonw -ErrorAction SilentlyContinue | Stop-Process -Force
-wscript.exe "$startupVbs"
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"""} | Out-Null
 
 Write-Host "`n===================================================" -ForegroundColor Green
 Write-Host " [SUCCESS] offGIT is installed and running!       " -ForegroundColor Green
 Write-Host "===================================================" -ForegroundColor Green
 Write-Host "offGIT is now monitoring your development environment in the background."
 Write-Host "Every project you create in Antigravity, Cursor, Claude Code, Godot, or Arduino IDE"
-Write-Host "will be continuously documented, synced, and version-controlled automatically."
+Write-Host "will be continuously documented, synced, and version-controlled automatically.`n"
+Write-Host "To verify status at any time, run:"
+Write-Host "  python ""$env:USERPROFILE\.offgit\sync_engine.py"" --fix`n"
