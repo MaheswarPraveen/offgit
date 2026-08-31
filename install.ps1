@@ -1,3 +1,4 @@
+# offGIT - One-Click Setup and Launch
 $ErrorActionPreference = "Continue"
 
 Write-Host "===================================================" -ForegroundColor Cyan
@@ -33,14 +34,16 @@ if (-not $py) {
 $offgitHome = "$env:USERPROFILE\.offgit"
 New-Item -ItemType Directory -Path $offgitHome, "$offgitHome\logs", "$offgitHome\thoughts" -Force | Out-Null
 
-# Handle local execution vs remote irm | iex execution
-if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "sync_engine.py"))) {
-    Write-Host "Deploying files from local clone..." -ForegroundColor Yellow
+# Detect whether running from local disk or piped from web
+$isLocal = [bool]$MyInvocation.MyCommand.Path -and (Test-Path "$PSScriptRoot\sync_engine.py")
+
+if ($isLocal) {
+    Write-Host "Deploying harness from local clone..." -ForegroundColor Yellow
     Get-ChildItem -Path $PSScriptRoot -File | ForEach-Object {
         Copy-Item $_.FullName -Destination $offgitHome -Force
     }
 } else {
-    Write-Host "Downloading latest offGIT harness files from GitHub..." -ForegroundColor Yellow
+    Write-Host "Downloading latest offGIT harness from GitHub..." -ForegroundColor Yellow
     $rawBase = "https://raw.githubusercontent.com/MaheswarPraveen/offgit/main"
     $files = @("sync_engine.py", "prompt_counter.py", "watcher.py", "debounce_trigger.py", "config.yaml", "FIXES.md", "README.md")
     foreach ($f in $files) {
@@ -102,12 +105,11 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 
 # 6. Windows Startup Registration & Silent Background Launch via WMI
 Write-Host "`n[5/5] Registering silent autostart on logon and launching daemon..." -ForegroundColor Yellow
-$appData = if ($env:APPDATA) { $env:APPDATA } else { "$env:USERPROFILE\AppData\Roaming" }
-$startupFolder = "$appData\Microsoft\Windows\Start Menu\Programs\Startup"
+$startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
 if (-not (Test-Path $startupFolder)) {
     New-Item -ItemType Directory -Path $startupFolder -Force | Out-Null
 }
-$startupVbs = "$startupFolder\offGIT.vbs"
+$startupVbs = Join-Path $startupFolder "offGIT.vbs"
 
 $pythonExe = (Get-Command python).Source
 $pythonDir = Split-Path $pythonExe
