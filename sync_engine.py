@@ -104,6 +104,16 @@ def run_cmd(cmd: list[str] | str, cwd: str | None = None, timeout: int = 30) -> 
         logger.error(f"Command execution failed ({cmd}): {e}")
         return 1, "", str(e)
 
+def get_authenticated_github_user() -> str:
+    """Dynamically retrieves the authenticated GitHub username from gh auth/api if not specified in config."""
+    configured = CONFIG.get("github_user", "")
+    if configured:
+        return configured
+    code, out, _ = run_cmd(["gh", "api", "user", "-q", ".login"], timeout=5)
+    if code == 0 and out.strip():
+        return out.strip()
+    return ""
+
 def check_github_prerequisites() -> tuple[bool, str]:
     """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
     if shutil.which("gh") is None:
@@ -525,7 +535,7 @@ Historical architectural decisions and technical trade-offs are documented conti
     run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
     run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path, timeout=10)
 
-    gh_user = CONFIG.get("github_user", "")
+    gh_user = get_authenticated_github_user()
     target = f"{gh_user}/{clean_name}" if gh_user else clean_name
     create_cmd = ["gh", "repo", "create", target, f"--{vis_flag}", "--source", ".", "--remote", "origin", "--push"]
     
@@ -639,7 +649,7 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
                     p_str = parts[1]
                     t_str = " ".join(parts[2:]).replace("-", " ").capitalize()
                 else:
-                    d_str = md.stem[:10] if len(md.stem) >= 10 else "—"
+                    d_str = md.stem[:10] if len(md.stem) >= 10 else "â€”"
                     p_str = proj_slug
                     t_str = md.stem[11:].replace("-", " ").capitalize() if len(md.stem) > 11 else md.stem
 

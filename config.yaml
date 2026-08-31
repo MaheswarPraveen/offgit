@@ -1,25 +1,28 @@
-# offGIT Configuration File
+# Core offGIT Configuration
+github_user: ""                      # Auto-detected automatically from GitHub CLI if left blank
+default_repo_visibility: "private"   # Default visibility for new repositories: "private" or "public"
+devlog_interval_seconds: 600         # Cadence for automated batch sweeps (600s = 10 minutes)
+llm_tool: "claude"                   # Fallback CLI for headless diff summarization
 
-llm_tool: claude
-devlog_interval_seconds: 600
-context_push_debounce_seconds: 120
-diff_char_limit: 8000
-default_repo_visibility: private
-prompt_threshold:
-  - 5
-  - 15
-  - 30
-  - 60
-notifications: native
+# Directories dynamically resolved relative to user home directory across all OS platforms
+watched_directories:
+  - "~/.gemini/antigravity/scratch"
+  - "~/Documents/Arduino"
+  - "~/Projects"
+  - "~/workspace"
+  - "~/dev"
+
+# File extensions monitored for diff generation
 watched_extensions:
-  - .ino
-  - .gd
-  - .py
-  - .ts
-  - .cpp
-  - .h
-  - .js
-  - .c
-  - .hpp
-  - .tscn
-  - .md
+  - ".ino"
+  - ".gd"
+  - ".py"
+  - ".ts"
+  - ".cpp"
+  - ".h"
+  - ".js"
+  - ".c"
+  - ".hpp"
+  - ".tscn"
+  - ".md"
+  - ".json"

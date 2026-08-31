@@ -60,8 +60,6 @@ Open **PowerShell** and execute:
 irm https://raw.githubusercontent.com/MaheswarPraveen/offgit/main/install.ps1 | iex
 ```
 
-*Manual alternative: Clone the repository and execute `setup.bat`.*
-
 ---
 
 ### macOS & Linux
@@ -72,13 +70,11 @@ Open **Terminal** and execute:
 curl -fsSL https://raw.githubusercontent.com/MaheswarPraveen/offgit/main/install.sh | bash
 ```
 
-*Manual alternative: Clone the repository, run `chmod +x install.sh && ./install.sh`.*
-
 ---
 
 ### Automated Setup Tasks
 
-The installer automates the full environment configuration:
+The one-line installer handles all setup automatically:
 
 1. Resolves system dependencies (`git`, `gh`, `python3`).
 2. Validates GitHub authentication (`gh auth login --web` if unauthenticated).
@@ -111,17 +107,22 @@ python ~/.offgit/sync_engine.py --fix
 
 ## Configuration Reference (`~/.offgit/config.yaml`)
 
+Paths are dynamically expanded relative to the user home directory (`~`):
+
 ```yaml
 # Core offGIT Configuration
-github_user: "MaheswarPraveen"
-default_repo_visibility: "private"
-devlog_interval_seconds: 600
-llm_tool: "claude"
+github_user: ""                      # Auto-detected automatically from GitHub CLI if left blank
+default_repo_visibility: "private"   # Default visibility for new repositories: "private" or "public"
+devlog_interval_seconds: 600         # Cadence for automated batch sweeps (600s = 10 minutes)
+llm_tool: "claude"                   # Fallback CLI for headless diff summarization
 
-# Monitored paths
+# Directories dynamically monitored across all platforms
 watched_directories:
-  - "C:\\Users\\xczma\\.gemini\\antigravity\\scratch"
-  - "C:\\Users\\xczma\\Documents\\Arduino"
+  - "~/.gemini/antigravity/scratch"
+  - "~/Documents/Arduino"
+  - "~/Projects"
+  - "~/workspace"
+  - "~/dev"
 
 # Monitored file extensions
 watched_extensions:
@@ -167,6 +168,7 @@ watched_extensions:
 - **Rebase Conflict Protection**: Auto-runs `git pull --rebase --autostash` before pushing. Reverts cleanly via `git rebase --abort` if a merge conflict occurs.
 - **Private by Default**: All scaffolded repositories and the `thoughts` repository default strictly to private visibility.
 - **Non-Destructive Pointer Injection**: Integrations in `CLAUDE.md`, `.cursorrules`, and `thoughts/README.md` use comment markers (`<!-- OFFGIT_DECISIONS_START -->`) to preserve user hand-written notes.
+- **Dynamic Path Expansion**: Resolves all user paths relative to home directory (`~`) with zero hardcoded usernames or machine-specific directories.
 
 ---
 

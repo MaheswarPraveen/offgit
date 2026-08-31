@@ -46,9 +46,29 @@ class IdleEventHandler(FileSystemEventHandler):
             cur = cur.parent
         return str(Path(file_path).parent)
 
+def get_watched_directories() -> list[str]:
+    """Dynamically resolves and expands user home directory paths (~) across Windows, macOS, and Linux."""
+    dirs = []
+    candidates = CONFIG.get("watched_directories", [
+        "~/.gemini/antigravity/scratch",
+        "~/Documents/Arduino",
+        "~/Projects",
+        "~/workspace",
+        "~/dev"
+    ])
+    for d in candidates:
+        try:
+            expanded = Path(d).expanduser().resolve()
+            if expanded.exists():
+                dirs.append(str(expanded))
+        except Exception as e:
+            logger.debug(f"Could not resolve directory {d}: {e}")
+    return dirs
+
 def discover_watched_repos() -> set[str]:
+    """Finds all existing git/offgit project directories under dynamic watched directories."""
     repos = set()
-    for base in CONFIG.get("watched_directories", []):
+    for base in get_watched_directories():
         base_p = Path(base)
         if not base_p.exists():
             continue
@@ -101,7 +121,7 @@ def main():
             return
 
         logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
-        dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
+        dirs = get_watched_directories()
         exts = CONFIG.get("watched_extensions", [
             ".ino", ".gd", ".py", ".ts", ".cpp", ".h", ".js", ".c", ".hpp", ".tscn", ".md", ".json", ".txt"
         ])

@@ -1,11 +1,11 @@
 # Live Project Context: offgit
 
-**Last Synced:** 2026-08-31 16:31:22
+**Last Synced:** 2026-08-31 16:34:06
 
 ## Current Focus & Active State
 
-- Directive: Verify GitHub sync and repository commit status
-- Rationale: Checking git status, remote log, and GitHub API to confirm all commits and installer updates are pushed live
+- Directive: Eliminate hardcoded paths and user references: implement dynamic home-directory resolution (~), automatic gh username detection, and harness directory discovery
+- Rationale: Refactoring config.yaml, sync_engine.py, and watcher.py to dynamically expand user home directories and detect GitHub user credentials without leaking hardcoded folder names
 
 ## Open Decisions & Next Steps
 
