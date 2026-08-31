@@ -4,6 +4,7 @@ import json
 import time
 import shutil
 import logging
+import platform
 import argparse
 import subprocess
 from datetime import datetime, timezone
@@ -48,11 +49,12 @@ def load_config() -> dict:
         "devlog_interval_seconds": 600,
         "context_push_debounce_seconds": 120,
         "diff_char_limit": 8000,
+        "default_repo_visibility": "private",
         "watched_extensions": [".ino", ".gd", ".py", ".ts", ".cpp", ".h", ".js", ".c", ".hpp", ".tscn", ".md"],
         "prompt_threshold": [5, 15, 30, 60],
         "thoughts_repo_path": str(THOUGHTS_DIR),
-        "github_user": "MaheswarPraveen",
-        "notifications": "windows_toast",
+        "github_user": "",
+        "notifications": "native",
         "watched_directories": [
             str(Path.home() / ".gemini" / "antigravity" / "scratch"),
             str(Path.home() / "Documents" / "Arduino"),
@@ -78,37 +80,54 @@ def strip_emojis(text: str) -> str:
         return ""
     return text.encode("ascii", "ignore").decode("ascii")
 
-def run_cmd(cmd: list[str] | str, cwd: str | None = None) -> tuple[int, str, str]:
-    shell = not isinstance(cmd, list)
+def run_cmd(cmd: list[str] | str, cwd: str | None = None, timeout: int = 30) -> tuple[int, str, str]:
+    """Executes a command safely with list args (shell=False) and strict timeout protection."""
+    is_list = isinstance(cmd, list)
     try:
         res = subprocess.run(
             cmd,
             cwd=cwd,
-            shell=shell,
+            shell=not is_list,
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            timeout=timeout
         )
         return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except subprocess.TimeoutExpired as te:
+        logger.warning(f"Command timed out after {timeout}s: {cmd}")
+        return 124, "", f"Timed out after {timeout}s"
     except Exception as e:
-        logger.error(f"Command failed ({cmd}): {e}")
+        logger.error(f"Command execution failed ({cmd}): {e}")
         return 1, "", str(e)
+
+def check_github_prerequisites() -> tuple[bool, str]:
+    """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
+    if shutil.which("gh") is None:
+        return False, "GitHub CLI ('gh') is not installed. offGIT requires GitHub CLI to operate. Install via: winget install GitHub.cli (or brew install gh / apt install gh)"
+
+    code, out, err = run_cmd(["gh", "auth", "status"], timeout=10)
+    if code != 0:
+        return False, "GitHub CLI is not authenticated. offGIT requires an authenticated GitHub session. Please run: gh auth login"
+
+    return True, ""
 
 def ensure_gitignore(repo_path: str) -> None:
     gitignore_path = Path(repo_path) / ".gitignore"
-    entry = "\n.offgit/\n"
+    entry = "\n.offgit/\nlogs/\n*.log\n"
     try:
         if gitignore_path.exists():
             content = gitignore_path.read_text(encoding="utf-8")
             if ".offgit" not in content:
                 gitignore_path.write_text(content.rstrip() + entry, encoding="utf-8")
         else:
-            gitignore_path.write_text(".offgit/\n", encoding="utf-8")
+            gitignore_path.write_text(".offgit/\nlogs/\n*.log\n", encoding="utf-8")
     except Exception as e:
         logger.warning(f"Could not update .gitignore in {repo_path}: {e}")
 
 def ensure_tool_pointers(repo_path: str) -> None:
+    """Non-destructively ensures AI editors have a pointer to CONTEXT.md without stomping on existing content."""
     pointer_line = "See CONTEXT.md for current project state."
     r_path = Path(repo_path)
 
@@ -118,7 +137,7 @@ def ensure_tool_pointers(repo_path: str) -> None:
             if f_path.exists():
                 c = f_path.read_text(encoding="utf-8")
                 if pointer_line not in c:
-                    f_path.write_text(f"{pointer_line}\n\n{c}", encoding="utf-8")
+                    f_path.write_text(f"{c.rstrip()}\n\n# Project Context\n{pointer_line}\n", encoding="utf-8")
             else:
                 f_path.write_text(f"{pointer_line}\n", encoding="utf-8")
         except Exception as e:
@@ -137,17 +156,17 @@ def get_diff(repo_path: str) -> str:
     if not (Path(repo_path) / ".git").exists():
         return ""
 
-    code, _, _ = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_path)
+    code, _, _ = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo_path, timeout=5)
     if code == 0:
-        code, diff_out, _ = run_cmd(["git", "diff", "HEAD"], cwd=repo_path)
+        code, diff_out, _ = run_cmd(["git", "diff", "HEAD"], cwd=repo_path, timeout=10)
         if not diff_out:
-            code, diff_out, _ = run_cmd(["git", "diff", "--cached"], cwd=repo_path)
+            code, diff_out, _ = run_cmd(["git", "diff", "--cached"], cwd=repo_path, timeout=10)
         if not diff_out:
-            code, status_out, _ = run_cmd(["git", "status", "--porcelain"], cwd=repo_path)
+            code, status_out, _ = run_cmd(["git", "status", "--porcelain"], cwd=repo_path, timeout=10)
             if status_out:
                 diff_out = f"Untracked / Modified files:\n{status_out}"
     else:
-        code, status_out, _ = run_cmd(["git", "status", "--porcelain"], cwd=repo_path)
+        code, status_out, _ = run_cmd(["git", "status", "--porcelain"], cwd=repo_path, timeout=10)
         diff_out = f"Initial files:\n{status_out}" if status_out else ""
 
     limit = CONFIG.get("diff_char_limit", 8000)
@@ -215,11 +234,15 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
         f"GIT DIFF:\n{diff}\n"
     )
 
+    # Safe list execution (shell=False) with strict 15s timeout
     if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
-        code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:4000].replace(chr(34), chr(39))}"')
+        code, out, err = run_cmd([cli_cmd, "-p", prompt[:4000]], timeout=15)
         if code == 0 and out.strip():
             return strip_emojis(out.strip())
+        else:
+            logger.debug(f"LLM headless summarizer failed (code {code}): {err}")
 
+    # Fallback diff heuristic
     bullets = []
     lines = diff.split("\n")
     modified_files = set()
@@ -253,7 +276,6 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
 
 def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -> str:
     fallback = f"Looks like you are actively working on '{project_hint}' - want me to create a GitHub repo for this?"
-
     if not prompt_log:
         return fallback
 
@@ -261,14 +283,14 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
     cli_cmd = CONFIG.get("llm_tool", "claude")
 
     prompt = (
-        "Based on these 5 developer prompts, generate a natural 1-sentence confirmation question "
+        "Based on these developer prompts, generate a natural 1-sentence confirmation question "
         "asking the user if they want a GitHub repository created and scaffolded for this project.\n\n"
         f"PROMPTS:\n{json.dumps(summaries, indent=2)}\n\n"
         "Rules: No emojis. Plain ASCII text only. Output ONLY the question."
     )
 
     if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
-        code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:2000].replace(chr(34), chr(39))}"')
+        code, out, _ = run_cmd([cli_cmd, "-p", prompt[:2000]], timeout=10)
         if code == 0 and out.strip():
             clean_q = strip_emojis(out.strip()).strip('"').strip("'")
             if "?" in clean_q:
@@ -285,13 +307,13 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
     cli_cmd = CONFIG.get("llm_tool", "claude")
 
     prompt = (
-        "Based on these 5 developer prompts, suggest a concise 2-4 word kebab-case repository name.\n\n"
+        "Based on these developer prompts, suggest a concise 2-4 word kebab-case repository name.\n\n"
         f"PROMPTS:\n{json.dumps(summaries, indent=2)}\n\n"
         "Rules: Output ONLY the lowercase kebab-case name (e.g. 'esp32-sensor-relay'). No quotes, no markdown."
     )
 
     if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
-        code, out, _ = run_cmd(f'{cli_cmd} -p "{prompt[:2000].replace(chr(34), chr(39))}"')
+        code, out, _ = run_cmd([cli_cmd, "-p", prompt[:2000]], timeout=10)
         if code == 0 and out.strip():
             candidate = strip_emojis(out.strip()).strip('"').strip("'").lower()
             candidate = "".join(c if (c.isalnum() or c == "-") else "-" for c in candidate).strip("-")
@@ -354,30 +376,43 @@ def update_context_md(repo_path: str, summary: str) -> None:
     ensure_tool_pointers(repo_path)
 
 def commit_and_push(repo_path: str) -> None:
+    """Stages, commits, pulls with rebase to prevent remote divergences, and pushes safely."""
     if not (Path(repo_path) / ".git").exists():
         return
 
     ensure_gitignore(repo_path)
-    run_cmd(["git", "add", "-A"], cwd=repo_path)
+    run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
 
-    code, staged_diff, _ = run_cmd(["git", "diff", "--cached", "--quiet"], cwd=repo_path)
+    code, staged_diff, _ = run_cmd(["git", "diff", "--cached", "--quiet"], cwd=repo_path, timeout=5)
     if code == 0:
         logger.info(f"No changes staged in {repo_path}, nothing to commit.")
         return
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     commit_msg = f"docs: offgit sync ({timestamp})"
-    code, _, err = run_cmd(["git", "commit", "-m", commit_msg], cwd=repo_path)
+    code, _, err = run_cmd(["git", "commit", "-m", commit_msg], cwd=repo_path, timeout=10)
     if code != 0:
         logger.error(f"Commit failed in {repo_path}: {err}")
         return
 
-    code, _, err = run_cmd(["git", "push"], cwd=repo_path)
-    if code == 0:
+    # Check remote destination
+    code_remote, remote_url, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path, timeout=5)
+    if code_remote != 0 or not remote_url:
+        logger.info(f"Local commit created. No remote configured for {repo_path}.")
+        return
+
+    # Pull with rebase first to prevent push rejection if upstream moved
+    pull_code, _, pull_err = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=repo_path, timeout=20)
+    if pull_code != 0:
+        logger.warning(f"git pull --rebase failed in {repo_path} (will attempt push): {pull_err}")
+
+    # Push to remote
+    code_push, _, push_err = run_cmd(["git", "push", "origin", "main"], cwd=repo_path, timeout=30)
+    if code_push == 0:
         logger.info(f"Pushed commit to remote in {repo_path}")
         notify(f"offGIT Synced: {Path(repo_path).name}", f"Pushed updates to GitHub at {timestamp}")
     else:
-        logger.warning(f"Git push failed in {repo_path} (remote may not be set): {err}")
+        logger.error(f"Git push failed in {repo_path}: {push_err}")
 
 def should_trigger_repo_check(count: int) -> bool:
     milestones = CONFIG.get("prompt_threshold", [5, 15, 30, 60])
@@ -387,19 +422,8 @@ def should_trigger_repo_check(count: int) -> bool:
         return count == milestones
     return count in [5, 15, 30, 60]
 
-def check_github_prerequisites() -> tuple[bool, str]:
-    """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
-    if shutil.which("gh") is None:
-        return False, "GitHub CLI ('gh') is not installed. offGIT requires GitHub CLI to operate. Install via: winget install GitHub.cli"
-
-    code, _, _ = run_cmd(["gh", "auth", "status"])
-    if code != 0:
-        return False, "GitHub CLI is not logged in. offGIT requires an authenticated GitHub session. Please run: gh auth login"
-
-    return True, ""
-
-def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
-    """Scaffolds and publishes a repository directly with the specified name in response to in-chat confirmation."""
+def scaffold_repo_direct(repo_path: str, repo_name: str, visibility: str = "") -> bool:
+    """Scaffolds and publishes a repository directly with configurable visibility (private/public)."""
     ready, msg = check_github_prerequisites()
     if not ready:
         logger.error(f"offGIT repository creation blocked: {msg}")
@@ -413,9 +437,13 @@ def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
     if not clean_name:
         clean_name = p_path.name
 
-    logger.info(f"Provisioning repository with confirmed name: {clean_name}")
+    # Check configured visibility default
+    vis_flag = visibility or CONFIG.get("default_repo_visibility", "private")
+    if vis_flag not in ["public", "private"]:
+        vis_flag = "private"
 
-    # 1. README.md
+    logger.info(f"Provisioning repository '{clean_name}' with visibility '{vis_flag}'")
+
     readme = p_path / "README.md"
     if not readme.exists():
         readme_content = f"""# {clean_name}
@@ -454,7 +482,6 @@ Created with and maintained with:
 """
         readme.write_text(readme_content, encoding="utf-8")
 
-    # 2. ARCHITECTURE.md
     arch = p_path / "ARCHITECTURE.md"
     if not arch.exists():
         arch_content = f"""# System Architecture: {clean_name}
@@ -479,7 +506,6 @@ Historical architectural decisions and technical trade-offs are documented conti
 """
         arch.write_text(arch_content, encoding="utf-8")
 
-    # 3. CONTEXT.md
     context_file = p_path / "CONTEXT.md"
     if not context_file.exists():
         update_context_md(repo_path, f"- Initial project repository initialized for {clean_name}.")
@@ -487,26 +513,33 @@ Historical architectural decisions and technical trade-offs are documented conti
     ensure_gitignore(repo_path)
     ensure_tool_pointers(repo_path)
 
-    # 4. Local Git initialization
     if not (p_path / ".git").exists():
-        run_cmd(["git", "init"], cwd=repo_path)
-        run_cmd(["git", "branch", "-M", "main"], cwd=repo_path)
+        run_cmd(["git", "init"], cwd=repo_path, timeout=5)
+        run_cmd(["git", "branch", "-M", "main"], cwd=repo_path, timeout=5)
+
+    run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
+    run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path, timeout=10)
 
     gh_user = CONFIG.get("github_user", "")
-    create_cmd = f"gh repo create {clean_name} --public --source . --remote origin --push" if not gh_user else f"gh repo create {gh_user}/{clean_name} --public --source . --remote origin --push"
+    target = f"{gh_user}/{clean_name}" if gh_user else clean_name
+    create_cmd = ["gh", "repo", "create", target, f"--{vis_flag}", "--source", ".", "--remote", "origin", "--push"]
     
-    code, out, err = run_cmd(create_cmd, cwd=repo_path)
+    code, out, err = run_cmd(create_cmd, cwd=repo_path, timeout=30)
     if code == 0:
-        logger.info(f"Successfully created and pushed remote repo {clean_name}")
-        notify("Repository Created", f"Created and published {clean_name} on GitHub")
+        logger.info(f"Successfully created and pushed remote repo {target} ({vis_flag})")
+        notify("Repository Created", f"Created and published {target} on GitHub ({vis_flag})")
         return True
     else:
-        run_cmd(["git", "add", "-A"], cwd=repo_path)
-        run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
-        run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
-        return True
+        logger.warning(f"gh repo create encountered an issue ({err}), attempting fallback git remote setup...")
+        run_cmd(["git", "remote", "add", "origin", f"https://github.com/{target}.git"], cwd=repo_path, timeout=5)
+        code_p, _, err_p = run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path, timeout=30)
+        if code_p == 0:
+            return True
+        logger.error(f"Failed to publish remote repository {target}: {err_p}")
+        return False
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
+    """Saves architecture decision records to private thoughts repo with remote validation."""
     if not prompt_context and not diff:
         return
 
@@ -518,8 +551,10 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
 
     thoughts_repo = Path(CONFIG.get("thoughts_repo_path", THOUGHTS_DIR))
     if not (thoughts_repo / ".git").exists():
+        logger.debug(f"Thoughts repository at {thoughts_repo} is not a git repository. Skipping thought sync.")
         return
 
+    # Sanitize slug
     slug = "".join(c if c.isalnum() else "-" for c in last_summary.lower())[:40].strip("-")
     date_str = datetime.now().strftime("%Y-%m-%d")
     filename = f"{date_str}-{slug}.md"
@@ -550,25 +585,46 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
 
     readme_path.write_text("\n".join(readme_lines) + "\n", encoding="utf-8")
 
-    run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo))
-    run_cmd(["git", "commit", "-m", f"docs(thoughts): record {slug}"], cwd=str(thoughts_repo))
-    run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo))
-    logger.info(f"Auto-synced thought to private thoughts repo: {filename}")
+    # Stage, commit, and push thoughts repo
+    run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
+    run_cmd(["git", "commit", "-m", f"docs(thoughts): record {slug}"], cwd=str(thoughts_repo), timeout=10)
+
+    # Check remote before pushing
+    code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
+    if code_r == 0 and remote_out.strip():
+        run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
+        code_p, _, err_p = run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
+        if code_p == 0:
+            logger.info(f"Auto-synced thought to private thoughts repo: {filename}")
+        else:
+            logger.warning(f"Could not push thought {filename} to remote thoughts repo: {err_p}")
 
 def notify(title: str, message: str) -> None:
-    clean_title = strip_emojis(title).replace("'", "''")
-    clean_msg = strip_emojis(message).replace("'", "''")
+    """Cross-platform notification provider supporting Windows, macOS, and Linux."""
+    clean_title = strip_emojis(title).replace("'", "''").replace('"', '\\"')
+    clean_msg = strip_emojis(message).replace("'", "''").replace('"', '\\"')
+    current_os = platform.system()
 
-    ps_cmd = (
-        f"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; "
-        f"$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); "
-        f"$textNodes = $template.GetElementsByTagName('text'); "
-        f"$textNodes.Item(0).AppendChild($template.CreateTextNode('{clean_title}')) > $null; "
-        f"$textNodes.Item(1).AppendChild($template.CreateTextNode('{clean_msg}')) > $null; "
-        f"$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
-        f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('offGIT').Show($toast);"
-    )
-    subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        if current_os == "Windows":
+            ps_cmd = (
+                f"[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; "
+                f"$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); "
+                f"$textNodes = $template.GetElementsByTagName('text'); "
+                f"$textNodes.Item(0).AppendChild($template.CreateTextNode('{clean_title}')) > $null; "
+                f"$textNodes.Item(1).AppendChild($template.CreateTextNode('{clean_msg}')) > $null; "
+                f"$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
+                f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('offGIT').Show($toast);"
+            )
+            subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif current_os == "Darwin":
+            osa_cmd = f'display notification "{clean_msg}" with title "{clean_title}"'
+            subprocess.Popen(["osascript", "-e", osa_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif current_os == "Linux":
+            if shutil.which("notify-send"):
+                subprocess.Popen(["notify-send", clean_title, clean_msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        logger.debug(f"Notification error: {e}")
 
 def run_sync(repo_path: str, trigger_source: str) -> None:
     ready, msg = check_github_prerequisites()
@@ -604,6 +660,7 @@ def main():
     parser.add_argument("--log-prompt", action="store_true", help="Append an entry to prompt-log.jsonl")
     parser.add_argument("--scaffold", action="store_true", help="Scaffold and create GitHub repository")
     parser.add_argument("--name", type=str, default="", help="Repository name for scaffolding")
+    parser.add_argument("--visibility", type=str, default="", help="Repository visibility: private or public")
     parser.add_argument("--tool", type=str, default="cli", help="Tool name for prompt logging")
     parser.add_argument("--summary", type=str, default="", help="Prompt summary text")
     parser.add_argument("--thinking", type=str, default="", help="AI thinking / architecture explanation")
@@ -612,9 +669,10 @@ def main():
 
     if args.scaffold and args.repo:
         name = args.name or Path(args.repo).name
-        success = scaffold_repo_direct(args.repo, name)
+        vis = args.visibility or CONFIG.get("default_repo_visibility", "private")
+        success = scaffold_repo_direct(args.repo, name, vis)
         if success:
-            print(f"[offGIT] Successfully created and pushed repository '{name}' to GitHub.")
+            print(f"[offGIT] Successfully created and pushed repository '{name}' ({vis}) to GitHub.")
         else:
             print(f"[offGIT] Failed to create repository '{name}'.")
     elif args.log_prompt and args.repo:

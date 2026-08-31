@@ -80,6 +80,14 @@ Projects managed by offGIT adhere to a clean, standardized structure:
 
 ---
 
+## Production Hardening & Safety
+
+- **Safe Subprocess Execution**: All commands and headless LLM calls execute with strict argument lists (`shell=False`) and timeout protection (15s on LLM calls, 30s on git operations), preventing shell-injection vulnerabilities.
+- **Divergence Prevention**: Auto-runs `git pull --rebase --autostash` before pushing to avoid rejected sync cycles if upstream moved.
+- **Private by Default**: New repositories scaffold as **private** by default (`default_repo_visibility: private` in `config.yaml`), giving you full control over repository exposure.
+- **Non-Destructive Pointer Injection**: AI editor rules (`CLAUDE.md`, `.cursorrules`, `CODEX.md`) are appended non-destructively without altering or overwriting existing hand-written user configurations.
+- **Cross-Platform OS Architecture**: Native notification adapters and process management across **Windows** (Toast / Startup launcher), **macOS** (osascript / launchd), and **Linux** (notify-send / systemd).
+
 ## Quick Start
 
 ### One-Click Automated Setup
