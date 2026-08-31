@@ -478,15 +478,20 @@ Historical architectural decisions and technical trade-offs are documented conti
     run_cmd(["git", "add", "-A"], cwd=repo_path)
     run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
 
-    # 5. Check GitHub CLI authentication status
+        # 5. Check if GitHub CLI is installed and in PATH
+    if shutil.which("gh") is None:
+        logger.warning(f"GitHub CLI ('gh') not found in PATH. Project scaffolded locally at {repo_path}.")
+        print(f"[offGIT] Local repository initialized and committed at '{repo_path}'.")
+        print(f"[offGIT] GitHub CLI ('gh') is not installed. To auto-publish repositories, install it via: winget install GitHub.cli")
+        return True
+
+    # 6. Check GitHub CLI authentication status
     code_auth, out_auth, err_auth = run_cmd(["gh", "auth", "status"])
     if code_auth != 0:
         logger.warning(f"GitHub CLI is not authenticated. Project scaffolded locally at {repo_path}.")
-        print(f"[offGIT AUTH REQUIRED] Local repository created and committed at '{repo_path}'.")
-        print(f"[offGIT AUTH REQUIRED] GitHub CLI is not logged in. To publish to GitHub, run: gh auth login")
-        return True
-
-    gh_user = CONFIG.get("github_user", "")
+        print(f"[offGIT] Local repository created and committed at '{repo_path}'.")
+        print(f"[offGIT] GitHub CLI is not logged in. To publish to GitHub, run: gh auth login")
+        return Truegh_user = CONFIG.get("github_user", "")
     create_cmd = f"gh repo create {clean_name} --public --source . --remote origin --push" if not gh_user else f"gh repo create {gh_user}/{clean_name} --public --source . --remote origin --push"
     
     code, out, err = run_cmd(create_cmd, cwd=repo_path)
