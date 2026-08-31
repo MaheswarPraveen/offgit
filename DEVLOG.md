@@ -44,3 +44,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Create unified one-click install.sh for macOS and Linux with automated dependency resolution, LaunchAgent, and systemd service registration
 - Rationale: Building cross-platform install.sh for macOS and Linux supporting brew, apt, pacman, dnf, browser OAuth, global rule deployment, launchd, and systemd autostart
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-08-31 16:45:28 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Eliminate hardcoded paths and user references: implement dynamic home-directory resolution (~), automatic gh username detection, and harness directory discovery
+- Rationale: Refactoring config.yaml, sync_engine.py, and watcher.py to dynamically expand user home directories and detect GitHub user credentials without leaking hardcoded folder names
+- Applied workspace modifications (+0/-0 lines).
