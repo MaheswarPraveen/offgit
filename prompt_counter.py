@@ -11,6 +11,8 @@ from sync_engine import (
     update_context_md,
     maybe_scaffold_repo,
     should_trigger_repo_check,
+    suggest_repo_name,
+    read_prompt_log,
     logger
 )
 
@@ -25,7 +27,7 @@ def main():
     repo_path = Path(args.repo).resolve()
 
     if not repo_path.exists():
-        return
+        repo_path.mkdir(parents=True, exist_ok=True)
 
     summary = args.prompt.strip() or f"User prompt in {args.tool}"
 
@@ -35,10 +37,18 @@ def main():
     # 2. Fast local CONTEXT.md snapshot update (local-only)
     update_context_md(str(repo_path), f"- Active Directive: {summary}")
 
+    print(f"[offGIT] Logged prompt #{count} for '{repo_path.name}'.")
+
     # 3. Check milestone threshold for repo inception
     if should_trigger_repo_check(count):
-        project_name = repo_path.name
-        maybe_scaffold_repo(str(repo_path), project_name)
+        prompts = read_prompt_log(str(repo_path))
+        sug_name = suggest_repo_name(prompts, repo_path.name, args.tool)
+        print(f"[offGIT MILESTONE] Milestone {count} reached for '{repo_path.name}'. Suggested repo name: '{sug_name}'.")
+        created = maybe_scaffold_repo(str(repo_path), repo_path.name)
+        if created:
+            print(f"[offGIT] Repository created and pushed to GitHub successfully.")
+        else:
+            print(f"[offGIT] Repository creation postponed by user at milestone {count}.")
 
 if __name__ == "__main__":
     main()

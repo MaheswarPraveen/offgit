@@ -327,12 +327,19 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
     return "-".join(words) or fallback_name
 
 def prompt_for_repo_name(suggested_name: str, question_text: str) -> str | None:
-    """Prompts the user to enter/confirm the GitHub repository name."""
+    """Prompts the user via a topmost GUI dialog to enter/confirm the GitHub repository name."""
     clean_q = strip_emojis(question_text).replace("'", "''").replace('"', '`"')
     clean_sug = strip_emojis(suggested_name).replace("'", "''").replace('"', '`"')
 
+    # Notify via desktop toast first so user gets an alert
+    notify("offGIT Milestone Reached", f"{clean_sug}: Ready to create repository?")
+
     ps_script = f"""
-[void][Reflection.Assembly]::LoadWithPartialName('Microsoft.VisualBasic')
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName Microsoft.VisualBasic
+$topForm = New-Object System.Windows.Forms.Form
+$topForm.TopMost = $true
+$topForm.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $title = 'offGIT - Name Your Repository'
 $msg = "{clean_q}`n`nEnter repository name (or click Cancel to postpone):"
 $name = [Microsoft.VisualBasic.Interaction]::InputBox($msg, $title, '{clean_sug}')
@@ -342,7 +349,8 @@ if ([string]::IsNullOrWhiteSpace($name)) {{ exit 1 }} else {{ Write-Output $name
         res = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps_script],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=60
         )
         if res.returncode == 0 and res.stdout.strip():
             chosen = res.stdout.strip().split("\n")[-1].strip()
@@ -350,14 +358,8 @@ if ([string]::IsNullOrWhiteSpace($name)) {{ exit 1 }} else {{ Write-Output $name
             return chosen_clean if chosen_clean else suggested_name
         return None
     except Exception as e:
-        logger.warning(f"GUI InputBox fallback: {e}")
-        print(f"\n[offGIT] {question_text}")
-        val = input(f"Enter repository name (default: '{suggested_name}'): ").strip()
-        if not val:
-            return suggested_name
-        if val.lower() in ["n", "no", "cancel"]:
-            return None
-        return "".join(c if (c.isalnum() or c in "-_.") else "-" for c in val.lower()).strip("-")
+        logger.warning(f"GUI dialog fallback: {e}")
+        return None
 
 def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
     devlog_path = Path(repo_path) / "DEVLOG.md"
