@@ -9,15 +9,15 @@ from sync_engine import (
     CONFIG,
     append_prompt_log,
     update_context_md,
-    maybe_scaffold_repo,
     should_trigger_repo_check,
     suggest_repo_name,
+    phrase_repo_question,
     read_prompt_log,
     logger
 )
 
 def main():
-    parser = argparse.ArgumentParser(description="offGIT Lightweight Fast Prompt Logger")
+    parser = argparse.ArgumentParser(description="offGIT In-Chat Fast Prompt Logger")
     parser.add_argument("--repo", type=str, required=True, help="Repository directory")
     parser.add_argument("--prompt", type=str, default="", help="Prompt text")
     parser.add_argument("--tool", type=str, default="claude-code", help="Tool name")
@@ -37,18 +37,14 @@ def main():
     # 2. Fast local CONTEXT.md snapshot update (local-only)
     update_context_md(str(repo_path), f"- Active Directive: {summary}")
 
-    print(f"[offGIT] Logged prompt #{count} for '{repo_path.name}'.")
-
-    # 3. Check milestone threshold for repo inception
+    # 3. Check milestone threshold for in-chat repo inception
     if should_trigger_repo_check(count):
         prompts = read_prompt_log(str(repo_path))
         sug_name = suggest_repo_name(prompts, repo_path.name, args.tool)
-        print(f"[offGIT MILESTONE] Milestone {count} reached for '{repo_path.name}'. Suggested repo name: '{sug_name}'.")
-        created = maybe_scaffold_repo(str(repo_path), repo_path.name)
-        if created:
-            print(f"[offGIT] Repository created and pushed to GitHub successfully.")
-        else:
-            print(f"[offGIT] Repository creation postponed by user at milestone {count}.")
+        question = phrase_repo_question(prompts, sug_name, args.tool)
+        print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: {question}")
+    else:
+        print(f"[offGIT] Logged prompt #{count} for '{repo_path.name}'.")
 
 if __name__ == "__main__":
     main()

@@ -24,12 +24,6 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 THOUGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(
-    filename=str(LOG_FILE),
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
 logger = logging.getLogger("offGIT")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -118,27 +112,17 @@ def ensure_tool_pointers(repo_path: str) -> None:
     pointer_line = "See CONTEXT.md for current project state."
     r_path = Path(repo_path)
 
-    claude_md = r_path / "CLAUDE.md"
-    try:
-        if claude_md.exists():
-            c = claude_md.read_text(encoding="utf-8")
-            if pointer_line not in c:
-                claude_md.write_text(f"{pointer_line}\n\n{c}", encoding="utf-8")
-        else:
-            claude_md.write_text(f"{pointer_line}\n", encoding="utf-8")
-    except Exception as e:
-        logger.debug(f"Could not write CLAUDE.md in {repo_path}: {e}")
-
-    codex_md = r_path / "CODEX.md"
-    try:
-        if codex_md.exists():
-            c = codex_md.read_text(encoding="utf-8")
-            if pointer_line not in c:
-                codex_md.write_text(f"{pointer_line}\n\n{c}", encoding="utf-8")
-        else:
-            codex_md.write_text(f"{pointer_line}\n", encoding="utf-8")
-    except Exception as e:
-        logger.debug(f"Could not write CODEX.md in {repo_path}: {e}")
+    for doc_name in ["CLAUDE.md", "CODEX.md", ".cursorrules"]:
+        f_path = r_path / doc_name
+        try:
+            if f_path.exists():
+                c = f_path.read_text(encoding="utf-8")
+                if pointer_line not in c:
+                    f_path.write_text(f"{pointer_line}\n\n{c}", encoding="utf-8")
+            else:
+                f_path.write_text(f"{pointer_line}\n", encoding="utf-8")
+        except Exception as e:
+            logger.debug(f"Could not write {doc_name} in {repo_path}: {e}")
 
     cursor_rules_dir = r_path / ".cursor" / "rules"
     cursor_rules_dir.mkdir(parents=True, exist_ok=True)
@@ -148,13 +132,6 @@ def ensure_tool_pointers(repo_path: str) -> None:
             cursor_mdc.write_text(f"---\ndescription: Live Project Context\nglobs: *\n---\n{pointer_line}\n", encoding="utf-8")
     except Exception as e:
         logger.debug(f"Could not write Cursor context.mdc in {repo_path}: {e}")
-
-    cursorrules_file = r_path / ".cursorrules"
-    try:
-        if not cursorrules_file.exists():
-            cursorrules_file.write_text(f"{pointer_line}\n", encoding="utf-8")
-    except Exception as e:
-        logger.debug(f"Could not write .cursorrules in {repo_path}: {e}")
 
 def get_diff(repo_path: str) -> str:
     if not (Path(repo_path) / ".git").exists():
@@ -301,7 +278,6 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
     return f"Looks like you are actively working on '{last_action}' - want me to create a GitHub repo for this?"
 
 def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> str:
-    """Suggests a clean, kebab-case repository name based on recent prompts."""
     if not prompt_log:
         return fallback_name.lower().replace(" ", "-")
 
@@ -311,7 +287,7 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
     prompt = (
         "Based on these 5 developer prompts, suggest a concise 2-4 word kebab-case repository name.\n\n"
         f"PROMPTS:\n{json.dumps(summaries, indent=2)}\n\n"
-        "Rules: Output ONLY the lowercase kebab-case name (e.g. 'esp32-sensor-relay' or 'godot-combat-system'). No quotes, no markdown."
+        "Rules: Output ONLY the lowercase kebab-case name (e.g. 'esp32-sensor-relay'). No quotes, no markdown."
     )
 
     if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
@@ -325,41 +301,6 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
     last_summary = summaries[-1] if summaries else fallback_name
     words = "".join(c if c.isalnum() else " " for c in last_summary.lower()).split()[:3]
     return "-".join(words) or fallback_name
-
-def prompt_for_repo_name(suggested_name: str, question_text: str) -> str | None:
-    """Prompts the user via a topmost GUI dialog to enter/confirm the GitHub repository name."""
-    clean_q = strip_emojis(question_text).replace("'", "''").replace('"', '`"')
-    clean_sug = strip_emojis(suggested_name).replace("'", "''").replace('"', '`"')
-
-    # Notify via desktop toast first so user gets an alert
-    notify("offGIT Milestone Reached", f"{clean_sug}: Ready to create repository?")
-
-    ps_script = f"""
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName Microsoft.VisualBasic
-$topForm = New-Object System.Windows.Forms.Form
-$topForm.TopMost = $true
-$topForm.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-$title = 'offGIT - Name Your Repository'
-$msg = "{clean_q}`n`nEnter repository name (or click Cancel to postpone):"
-$name = [Microsoft.VisualBasic.Interaction]::InputBox($msg, $title, '{clean_sug}')
-if ([string]::IsNullOrWhiteSpace($name)) {{ exit 1 }} else {{ Write-Output $name; exit 0 }}
-"""
-    try:
-        res = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps_script],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            chosen = res.stdout.strip().split("\n")[-1].strip()
-            chosen_clean = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in chosen.lower()).strip("-")
-            return chosen_clean if chosen_clean else suggested_name
-        return None
-    except Exception as e:
-        logger.warning(f"GUI dialog fallback: {e}")
-        return None
 
 def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
     devlog_path = Path(repo_path) / "DEVLOG.md"
@@ -439,7 +380,6 @@ def commit_and_push(repo_path: str) -> None:
         logger.warning(f"Git push failed in {repo_path} (remote may not be set): {err}")
 
 def should_trigger_repo_check(count: int) -> bool:
-    """Evaluates if the prompt count exactly matches one of the specified milestones [5, 15, 30, 60]."""
     milestones = CONFIG.get("prompt_threshold", [5, 15, 30, 60])
     if isinstance(milestones, list):
         return count in milestones
@@ -447,45 +387,20 @@ def should_trigger_repo_check(count: int) -> bool:
         return count == milestones
     return count in [5, 15, 30, 60]
 
-def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
-    """Prompts user with context-aware question and allows custom repository naming before provisioning."""
-    if (Path(repo_path) / ".git").exists():
-        code, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path)
-        if code == 0 and remote_out.strip():
-            return False
-
-    auto_dir = Path(repo_path) / ".offgit"
-    count_file = auto_dir / "prompt-count"
-    count = 0
-    if count_file.exists():
-        try:
-            count = int(count_file.read_text(encoding="utf-8").strip())
-        except ValueError:
-            count = 0
-
-    if not should_trigger_repo_check(count):
-        return False
-
-    prompt_context = read_prompt_log(repo_path)
-    tool = CONFIG.get("llm_tool", "claude")
-
-    suggested_name = suggest_repo_name(prompt_context, project_name, tool)
-    question_text = phrase_repo_question(prompt_context, suggested_name, tool)
-
-    final_repo_name = prompt_for_repo_name(suggested_name, question_text)
-
-    if not final_repo_name:
-        logger.info(f"User postponed repository creation for {project_name} at prompt {count}.")
-        return False
-
-    logger.info(f"Initializing repository with confirmed name: {final_repo_name}")
+def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
+    """Scaffolds and publishes a repository directly with the specified name in response to in-chat confirmation."""
     p_path = Path(repo_path)
     p_path.mkdir(parents=True, exist_ok=True)
+    clean_name = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in repo_name.lower()).strip("-")
 
-    # 1. Professional README.md
+    if not clean_name:
+        clean_name = p_path.name
+
+    logger.info(f"Provisioning repository with confirmed name: {clean_name}")
+
     readme = p_path / "README.md"
     if not readme.exists():
-        readme_content = f"""# {final_repo_name}
+        readme_content = f"""# {clean_name}
 
 **Production-grade technical implementation and project repository.**
 
@@ -493,7 +408,7 @@ def maybe_scaffold_repo(repo_path: str, project_name: str) -> bool:
 
 ## Overview
 
-This repository contains the codebase and architectural specifications for **{final_repo_name}**.
+This repository contains the codebase and architectural specifications for **{clean_name}**.
 
 - **Live Project State**: Consult [`CONTEXT.md`](./CONTEXT.md) for current focus and open technical decisions.
 - **Changelog & Rationale**: Review [`DEVLOG.md`](./DEVLOG.md) for chronological development updates and technical trade-offs.
@@ -507,18 +422,27 @@ Refer to project configuration and dependency files to initialize the local buil
 
 ---
 
-*Continuous context and repository synchronization maintained by offGIT.*`n`n---\n`n## Credits & Attribution`n`nCreated with and maintained with:`n- **Flash 3.7**`n- **Opus 4.6**`n- **Sonnet 5**`n- **Antigravity**
+*Continuous context and repository synchronization maintained by offGIT.*
+
+---
+
+## Credits & Attribution
+
+Created with and maintained with:
+- **Flash 3.7**
+- **Opus 4.6**
+- **Sonnet 5**
+- **Antigravity**
 """
         readme.write_text(readme_content, encoding="utf-8")
 
-    # 2. Professional ARCHITECTURE.md
     arch = p_path / "ARCHITECTURE.md"
     if not arch.exists():
-        arch_content = f"""# System Architecture: {final_repo_name}
+        arch_content = f"""# System Architecture: {clean_name}
 
 ## 1. Architectural Overview
 
-This document outlines the core system design, component boundaries, and implementation patterns for **{final_repo_name}**.
+This document outlines the core system design, component boundaries, and implementation patterns for **{clean_name}**.
 
 ---
 
@@ -536,10 +460,9 @@ Historical architectural decisions and technical trade-offs are documented conti
 """
         arch.write_text(arch_content, encoding="utf-8")
 
-    # 3. Professional CONTEXT.md
     context_file = p_path / "CONTEXT.md"
     if not context_file.exists():
-        update_context_md(repo_path, f"- Initial project repository initialized for {final_repo_name}.")
+        update_context_md(repo_path, f"- Initial project repository initialized for {clean_name}.")
 
     ensure_gitignore(repo_path)
     ensure_tool_pointers(repo_path)
@@ -549,19 +472,18 @@ Historical architectural decisions and technical trade-offs are documented conti
         run_cmd(["git", "branch", "-M", "main"], cwd=repo_path)
 
     gh_user = CONFIG.get("github_user", "MaheswarPraveen")
-    code, out, err = run_cmd(f'gh repo create {gh_user}/{final_repo_name} --public --confirm', cwd=repo_path)
+    code, out, err = run_cmd(f'gh repo create {gh_user}/{clean_name} --public --confirm', cwd=repo_path)
     if code == 0:
-        run_cmd(["git", "remote", "add", "origin", f"https://github.com/{gh_user}/{final_repo_name}.git"], cwd=repo_path)
+        run_cmd(["git", "remote", "add", "origin", f"https://github.com/{gh_user}/{clean_name}.git"], cwd=repo_path)
         run_cmd(["git", "add", "-A"], cwd=repo_path)
         run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
         run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
-        logger.info(f"Successfully created and pushed remote repo {gh_user}/{final_repo_name}")
-        notify("Repository Created", f"Created and scaffolded {gh_user}/{final_repo_name}")
+        logger.info(f"Successfully created and pushed remote repo {gh_user}/{clean_name}")
+        notify("Repository Created", f"Created and scaffolded {gh_user}/{clean_name}")
         return True
     else:
         logger.error(f"gh repo create failed: {err}")
-
-    return False
+        return False
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     if not prompt_context and not diff:
@@ -612,36 +534,6 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo))
     logger.info(f"Auto-synced thought to private thoughts repo: {filename}")
 
-def schedule_debounced_context_push(repo_path: str, delay_seconds: int = 120, max_wait_seconds: int = 300) -> None:
-    auto_dir = Path(repo_path) / ".offgit"
-    auto_dir.mkdir(parents=True, exist_ok=True)
-
-    ts_file = auto_dir / "last-prompt.timestamp"
-    first_file = auto_dir / "first-prompt.timestamp"
-    now = time.time()
-
-    ts_file.write_text(str(now), encoding="utf-8")
-    if not first_file.exists():
-        first_file.write_text(str(now), encoding="utf-8")
-
-    cmd = (
-        f"python -c \""
-        f"import time, os, subprocess, sys; "
-        f"delay = {delay_seconds}; "
-        f"max_wait = {max_wait_seconds}; "
-        f"ts_f = r'{ts_file}'; "
-        f"first_f = r'{first_file}'; "
-        f"repo = r'{repo_path}'; "
-        f"time.sleep(delay); "
-        f"now_t = time.time(); "
-        f"last_t = float(open(ts_f).read().strip()) if os.path.exists(ts_f) else now_t; "
-        f"first_t = float(open(first_f).read().strip()) if os.path.exists(first_f) else now_t; "
-        f"if (now_t - last_t >= delay) or (now_t - first_t >= max_wait): "
-        f"    subprocess.run([sys.executable, r'{Path.home() / '.offgit' / 'sync_engine.py'}', '--repo', repo, '--trigger', 'context-debounce']); "
-        f"    if os.path.exists(first_f): os.remove(first_f);\""
-    )
-    subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
 def notify(title: str, message: str) -> None:
     clean_title = strip_emojis(title).replace("'", "''")
     clean_msg = strip_emojis(message).replace("'", "''")
@@ -683,16 +575,24 @@ def main():
     parser.add_argument("--repo", type=str, help="Path to project repository")
     parser.add_argument("--trigger", type=str, default="cli", help="Trigger source identifier")
     parser.add_argument("--log-prompt", action="store_true", help="Append an entry to prompt-log.jsonl")
+    parser.add_argument("--scaffold", action="store_true", help="Scaffold and create GitHub repository")
+    parser.add_argument("--name", type=str, default="", help="Repository name for scaffolding")
     parser.add_argument("--tool", type=str, default="cli", help="Tool name for prompt logging")
     parser.add_argument("--summary", type=str, default="", help="Prompt summary text")
     parser.add_argument("--thinking", type=str, default="", help="AI thinking / architecture explanation")
 
     args = parser.parse_args()
 
-    if args.log_prompt and args.repo:
+    if args.scaffold and args.repo:
+        name = args.name or Path(args.repo).name
+        success = scaffold_repo_direct(args.repo, name)
+        if success:
+            print(f"[offGIT] Successfully created and pushed repository '{name}' to GitHub.")
+        else:
+            print(f"[offGIT] Failed to create repository '{name}'.")
+    elif args.log_prompt and args.repo:
         count = append_prompt_log(args.repo, args.tool, args.summary, args.thinking)
         update_context_md(args.repo, f"- Active prompt: {args.summary}")
-        schedule_debounced_context_push(args.repo, CONFIG.get("context_push_debounce_seconds", 120))
         print(f"Logged prompt to offGIT. Current count: {count}")
     elif args.repo:
         run_sync(args.repo, args.trigger)
