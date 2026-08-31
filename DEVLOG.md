@@ -38,3 +38,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Redesign thoughts naming convention and chronological index table for high recall and readability
 - Rationale: Structuring thought filenames as YYYY-MM-DD_<project>_<slug>.md and formatting thoughts/README.md as a clean searchable index table by date and project
 - Updated `CONTEXT.md`, `sync_engine.py` (+52/-35 lines).
+
+## 2026-08-31 16:22:10 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Create unified one-click install.sh for macOS and Linux with automated dependency resolution, LaunchAgent, and systemd service registration
+- Rationale: Building cross-platform install.sh for macOS and Linux supporting brew, apt, pacman, dnf, browser OAuth, global rule deployment, launchd, and systemd autostart
+- Updated `CONTEXT.md` (+3/-17 lines).
