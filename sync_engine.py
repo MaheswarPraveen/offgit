@@ -543,15 +543,9 @@ Historical architectural decisions and technical trade-offs are documented conti
         logger.error(f"Failed to publish remote repository {target}: {err_p}")
         return False
 
-def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
-    """Saves architecture decision records to private thoughts repo with remote validation."""
-    if not prompt_context and not diff:
-        return
-
-    last_summary = prompt_context[-1].get("summary", "") if prompt_context else ""
-    last_thinking = prompt_context[-1].get("ai_thinking", "") if prompt_context else ""
-
-    if not last_summary or len(last_summary) < 10:
+def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
+    """Simultaneously extracts all un-synced brainstorming thoughts and architecture decisions into the thoughts repository."""
+    if not prompt_context:
         return
 
     thoughts_repo = Path(CONFIG.get("thoughts_repo_path", THOUGHTS_DIR))
@@ -559,50 +553,93 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
         logger.debug(f"Thoughts repository at {thoughts_repo} is not a git repository. Skipping thought sync.")
         return
 
-    # Sanitize slug
-    slug = "".join(c if c.isalnum() else "-" for c in last_summary.lower())[:40].strip("-")
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"{date_str}-{slug}.md"
-    file_path = thoughts_repo / filename
+    # Check last-synced timestamp to avoid re-syncing duplicate thoughts
+    ts_file = None
+    last_sync_ts = ""
+    if repo_path:
+        ts_file = Path(repo_path) / ".offgit" / "last-thought-sync.ts"
+        if ts_file.exists():
+            try:
+                last_sync_ts = ts_file.read_text(encoding="utf-8").strip()
+            except Exception:
+                last_sync_ts = ""
 
-    content = f"# Technical Decision: {last_summary}\n\n"
-    content += f"**Date:** {date_str}  \n"
-    content += f"**Tool:** {tool}  \n\n"
-    content += f"## Problem & Directive\n\n{last_summary}\n\n"
-    if last_thinking:
-        content += f"## AI Architectural Reasoning\n\n{last_thinking}\n\n"
-    if diff:
-        content += f"## Accompanying Diff Summary\n\n```diff\n{diff[:2000]}\n```\n"
+    new_thoughts_count = 0
+    latest_processed_ts = last_sync_ts
 
-    file_path.write_text(strip_emojis(content), encoding="utf-8")
+    for entry in prompt_context:
+        entry_ts = entry.get("ts", "")
+        if last_sync_ts and entry_ts <= last_sync_ts:
+            continue
 
-    readme_path = thoughts_repo / "README.md"
-    all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
-    readme_lines = [
-        "# Private Technical Thoughts & Decision Corpus\n",
-        "Private repository of architecture decisions and developer reasoning maintained by offGIT.\n",
-        "## Recent Decisions\n"
-    ]
-    for md in all_mds:
-        if md.name != "README.md":
-            title = md.stem.replace("-", " ").capitalize()
-            readme_lines.append(f"- [{title}]({md.name})")
+        summary = entry.get("summary", "").strip()
+        thinking = entry.get("ai_thinking", "").strip()
+        entry_tool = entry.get("tool", tool)
 
-    readme_path.write_text("\n".join(readme_lines) + "\n", encoding="utf-8")
+        # Filter out trivial greetings (< 8 chars or common short phrases)
+        if not summary or len(summary) < 8 or summary.lower() in ["hi", "hello", "hey", "cool", "yes", "no", "ok", "okay"]:
+            continue
 
-    # Stage, commit, and push thoughts repo
-    run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
-    run_cmd(["git", "commit", "-m", f"docs(thoughts): record {slug}"], cwd=str(thoughts_repo), timeout=10)
+        # Sanitize slug
+        slug = "".join(c if c.isalnum() else "-" for c in summary.lower())[:45].strip("-")
+        if not slug:
+            continue
 
-    # Check remote before pushing
-    code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
-    if code_r == 0 and remote_out.strip():
-        run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
-        code_p, _, err_p = run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
-        if code_p == 0:
-            logger.info(f"Auto-synced thought to private thoughts repo: {filename}")
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        filename = f"{date_str}-{slug}.md"
+        file_path = thoughts_repo / filename
+
+        content = f"# Technical Thought & Architecture Decision: {summary}\n\n"
+        content += f"**Date:** {date_str}  \n"
+        content += f"**Tool:** {entry_tool}  \n"
+        if repo_path:
+            content += f"**Project:** `{Path(repo_path).name}`  \n\n"
         else:
-            logger.warning(f"Could not push thought {filename} to remote thoughts repo: {err_p}")
+            content += "\n"
+
+        content += f"## Problem & Directive\n\n{summary}\n\n"
+        if thinking:
+            content += f"## AI Architectural Reasoning\n\n{thinking}\n\n"
+        if diff:
+            content += f"## Accompanying Diff Summary\n\n```diff\n{diff[:2000]}\n```\n"
+
+        file_path.write_text(strip_emojis(content), encoding="utf-8")
+        new_thoughts_count += 1
+        if entry_ts > latest_processed_ts:
+            latest_processed_ts = entry_ts
+
+    if new_thoughts_count > 0:
+        # Update README index
+        readme_path = thoughts_repo / "README.md"
+        all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
+        readme_lines = [
+            "# Private Technical Thoughts & Decision Corpus\n",
+            "Private repository of architecture decisions and developer reasoning maintained by offGIT.\n",
+            "## Recent Decisions\n"
+        ]
+        for md in all_mds:
+            if md.name != "README.md":
+                title = md.stem.replace("-", " ").capitalize()
+                readme_lines.append(f"- [{title}]({md.name})")
+
+        readme_path.write_text("\n".join(readme_lines) + "\n", encoding="utf-8")
+
+        # Stage, commit, and push thoughts
+        run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
+        commit_msg = f"docs(thoughts): sync {new_thoughts_count} decision records"
+        run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
+
+        code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
+        if code_r == 0 and remote_out.strip():
+            run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=str(thoughts_repo), timeout=20)
+            code_p, _, err_p = run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
+            if code_p == 0:
+                logger.info(f"Auto-synced {new_thoughts_count} thoughts to private thoughts repository.")
+            else:
+                logger.warning(f"Could not push thoughts to remote repository: {err_p}")
+
+        if ts_file and latest_processed_ts:
+            ts_file.write_text(latest_processed_ts, encoding="utf-8")
 
 def notify(title: str, message: str) -> None:
     """Cross-platform notification provider supporting Windows, macOS, and Linux without console popups."""
@@ -657,7 +694,7 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
     write_devlog(repo_path, summary, trigger_source)
     update_context_md(repo_path, summary)
     commit_and_push(repo_path)
-    classify_thought(diff, prompt_context, trigger_source)
+    classify_thought(diff, prompt_context, trigger_source, repo_path)
 
 def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
     """Performs automated self-healing diagnostics and prints known error patterns from FIXES.md."""
