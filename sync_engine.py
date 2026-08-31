@@ -404,7 +404,10 @@ def commit_and_push(repo_path: str) -> None:
     # Pull with rebase first to prevent push rejection if upstream moved
     pull_code, _, pull_err = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=repo_path, timeout=20)
     if pull_code != 0:
-        logger.warning(f"git pull --rebase failed in {repo_path} (will attempt push): {pull_err}")
+        logger.warning(f"git pull --rebase encountered a conflict in {repo_path}: {pull_err}")
+        run_cmd(["git", "rebase", "--abort"], cwd=repo_path, timeout=10)
+        logger.info(f"Aborted rebase in {repo_path} to restore clean local state. Skipping push for this cycle.")
+        return
 
     # Push to remote
     code_push, _, push_err = run_cmd(["git", "push", "origin", "main"], cwd=repo_path, timeout=30)

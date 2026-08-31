@@ -1,11 +1,24 @@
 import os
 import sys
 import json
+import shutil
 import argparse
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 MILESTONES = {5, 15, 30, 60}
+
+def is_gh_authenticated() -> tuple[bool, str]:
+    if shutil.which("gh") is None:
+        return False, "GitHub CLI ('gh') is not installed."
+    try:
+        res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=3)
+        if res.returncode == 0:
+            return True, ""
+        return False, "GitHub CLI is not logged in."
+    except Exception as e:
+        return False, str(e)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -64,9 +77,13 @@ def main():
 
     # 4. Check milestone
     if count in MILESTONES:
-        words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
-        sug_name = "-".join(words) or repo.name.lower()
-        print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
+        authed, auth_msg = is_gh_authenticated()
+        if not authed:
+            print(f"[offGIT AUTH REQUIRED] Milestone {count} reached on '{repo.name}'. {auth_msg} Run 'gh auth login' to connect your GitHub account.")
+        else:
+            words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
+            sug_name = "-".join(words) or repo.name.lower()
+            print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
     else:
         print(f"[offGIT] Logged prompt #{count} for '{repo.name}'.")
 
