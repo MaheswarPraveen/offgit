@@ -57,49 +57,73 @@ For environments that lack native AI extension APIs, offGIT provides automated G
 
 ---
 
-## One-Click Installation
+## Installation Guide (Windows, macOS, Linux)
 
-offGIT provides automated **one-click / one-line installation** across Windows, macOS, and Linux:
+### 🪟 Windows Installation
 
-### 1. Windows (One-Click)
+Choose **any one** of the three methods below:
 
-Double-click **`setup.bat`** (or execute via PowerShell):
+#### Method 1: One-Line PowerShell Command (Fastest — No Git Clone Required)
+Open **PowerShell** and paste:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1
+irm https://raw.githubusercontent.com/MaheswarPraveen/offgit/main/install.ps1 | iex
 ```
 
 ---
 
-### 2. macOS & Linux (One-Line)
+#### Method 2: Git Clone & Double-Click Setup
+If you prefer cloning the repository manually:
 
-Run the automated installer script:
+1. Open PowerShell or Terminal and clone the repository:
+   ```powershell
+   git clone https://github.com/MaheswarPraveen/offgit.git
+   cd offgit
+   ```
+2. Double-click **`setup.bat`** (or run `.\setup.bat` in PowerShell).
+
+---
+
+#### Method 3: Download ZIP (No Git or Terminal Required)
+1. Click the green **`< > Code`** button at the top of this GitHub page $\rightarrow$ select **`Download ZIP`**.
+2. Extract the ZIP file anywhere on your computer.
+3. Open the extracted folder and double-click **`setup.bat`**.
+
+---
+
+### 🍎 macOS & 🐧 Linux Installation
+
+Open your terminal and run the one-line installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MaheswarPraveen/offgit/main/install.sh | bash
 ```
 
-Or from a local clone:
+*Or from a local clone:*
 ```bash
+git clone https://github.com/MaheswarPraveen/offgit.git
+cd offgit
 chmod +x install.sh && ./install.sh
 ```
 
 ---
 
-### What the One-Click Installer Automates:
+## What the One-Click Installer Automates
 
-1. **Dependency Resolution**: Automatically installs missing tools (`git`, `gh`, `python3`) via `winget` (Windows), `brew` (macOS), `apt` (Debian/Ubuntu), `dnf` (Fedora), or `pacman` (Arch).
-2. **Browser OAuth Login**: Verifies `gh auth status` and opens browser authentication if needed.
-3. **Python Libraries**: Installs required runtime packages (`pyyaml`, `watchdog`).
-4. **Global Rule Injection**: Deploys offGIT harness instructions for Antigravity, Claude Code, Cursor, and Codex.
-5. **Private Thoughts Repository**: Creates and initializes your private `thoughts` GitHub repository.
-6. **Autostart Service**: Registers a background startup service (**Windows Startup VBS**, **macOS LaunchAgent**, or **Linux systemd service**) and starts the watcher daemon silently.
+Regardless of your operating system, the installer handles all setup automatically:
+
+1. **Dependency Resolution**: Installs missing prerequisites (`git`, `gh`, `python3`) via `winget` (Windows), `brew` (macOS), `apt` (Ubuntu/Debian), `dnf` (Fedora), or `pacman` (Arch).
+2. **Browser OAuth Login**: Checks `gh auth status` and opens your default browser for one-click authorization if needed.
+3. **Python Runtime Libraries**: Installs required runtime packages (`pyyaml`, `watchdog`).
+4. **Global AI Rule Injection**: Deploys offGIT integration rules to **Antigravity**, **Claude Code** (`~/.claude/settings.json`), **Cursor** (`~/.cursorrules`), and **Codex**.
+5. **Private Thoughts Repository**: Creates and initializes your private `thoughts` repository on GitHub.
+6. **Silent Autostart Service**: Registers a background startup service (**Windows Startup VBS**, **macOS LaunchAgent**, or **Linux systemd service**) and starts the background daemon.
 
 ---
 
-## Verification & Self-Healing Diagnostics
+## Post-Install Verification & Self-Healing
 
-To verify that offGIT is active and healthy, or to perform self-healing diagnostics:
+To verify that offGIT is active and healthy, or to run automated self-healing diagnostics at any time:
 
 ```bash
 python ~/.offgit/sync_engine.py --fix
@@ -120,7 +144,7 @@ python ~/.offgit/sync_engine.py --fix
 
 ## Configuration Reference (`~/.offgit/config.yaml`)
 
-You can customize offGIT behavior by modifying `~/.offgit/config.yaml`:
+You can customize offGIT behavior by editing `~/.offgit/config.yaml`:
 
 ```yaml
 # Core offGIT Configuration
