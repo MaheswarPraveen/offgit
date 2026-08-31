@@ -26,30 +26,40 @@ def main():
         print("[offGIT] Cursor CLI check (optional).")
 
     req_file = Path.home() / ".offgit" / "requirements.txt"
-    run(f'"{sys.executable}" -m pip install -r "{req_file}" -q')
+    if req_file.exists():
+        run(f'"{sys.executable}" -m pip install -r "{req_file}" -q')
 
+    # Hard gate: Require GitHub CLI login
     status = run("gh auth status", check=False)
-    if status.returncode != 0:
-        print("[offGIT] GitHub login required â€” opening browser for OAuth authorization...")
-        run("gh auth login --web --git-protocol https -h github.com")
-    else:
-        print("[offGIT] GitHub CLI authenticated.")
+    while status.returncode != 0:
+        print("[offGIT AUTH REQUIRED] GitHub CLI is not logged in.")
+        print("[offGIT] Opening web browser for GitHub authorization...")
+        run("gh auth login --web --git-protocol https -h github.com", check=False)
+        status = run("gh auth status", check=False)
+        if status.returncode != 0:
+            print("[offGIT] Login unsuccessful. offGIT requires an authenticated GitHub CLI session to operate.")
+            print("[offGIT] Retrying...")
 
-    watcher_script = Path.home() / ".offgit" / "watcher.py"
-    pythonw = Path(sys.executable).parent / "pythonw.exe"
+    print("[offGIT] GitHub CLI verified and authenticated.")
+
+    # Configure user startup script
+    startup_dir = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    startup_vbs = startup_dir / "offGIT.vbs"
+    py_dir = Path(sys.executable).parent
+    pythonw = py_dir / "pythonw.exe"
     if not pythonw.exists():
         pythonw = Path(sys.executable)
 
-    schtasks_cmd = (
-        f'schtasks /create /tn "offGIT" /tr '
-        f'"{pythonw} {watcher_script}" '
-        f'/sc onlogon /f'
-    )
-    subprocess.run(schtasks_cmd, shell=True, capture_output=True)
+    watcher_script = Path.home() / ".offgit" / "watcher.py"
+    vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run """{pythonw}"" ""{watcher_script}""", 0, False
+'''
+    startup_vbs.write_text(vbs_content, encoding="utf-8")
+    (Path.home() / ".offgit" / "start_offgit.vbs").write_text(vbs_content, encoding="utf-8")
 
-    # Launch background watcher
+    # Start background watcher
     subprocess.Popen([str(pythonw), str(watcher_script)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("[offGIT] Done. offGIT is running in the background and registered for autostart.")
+    print("[offGIT] Done. offGIT is authenticated, running in the background, and registered for autostart.")
 
 if __name__ == "__main__":
     main()

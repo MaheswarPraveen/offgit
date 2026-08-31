@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import shutil
 import threading
 import logging
 from pathlib import Path
@@ -8,7 +9,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 sys.path.insert(0, str(Path.home() / ".offgit"))
-from sync_engine import CONFIG, run_sync, get_diff, read_prompt_log, logger
+from sync_engine import CONFIG, run_sync, get_diff, read_prompt_log, check_github_prerequisites, logger
 
 class IdleEventHandler(FileSystemEventHandler):
     def __init__(self, extensions):
@@ -38,12 +39,16 @@ class IdleEventHandler(FileSystemEventHandler):
         return str(Path(file_path).parent)
 
 def devlog_10min_batch_loop(handler: IdleEventHandler):
-    """Consolidated 10-minute batch engine: evaluates diffs and accumulated prompts, commits and pushes."""
     interval = CONFIG.get("devlog_interval_seconds", 600)
     logger.info(f"10-minute batch sync loop started (interval: {interval}s)")
 
     while True:
         time.sleep(interval)
+        ready, msg = check_github_prerequisites()
+        if not ready:
+            logger.warning(f"Batch sync paused: {msg}")
+            continue
+
         repos = list(handler.active_repos)
         for repo in repos:
             try:
@@ -56,6 +61,12 @@ def devlog_10min_batch_loop(handler: IdleEventHandler):
                 logger.error(f"Error in 10-minute batch sync on {repo}: {e}")
 
 def main():
+    ready, msg = check_github_prerequisites()
+    if not ready:
+        logger.error(f"Cannot start offGIT Watcher: {msg}")
+        print(f"[offGIT BLOCKED] {msg}")
+        return
+
     logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
     dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
     exts = CONFIG.get("watched_extensions", [".ino", ".gd", ".py", ".ts", ".cpp", ".h"])

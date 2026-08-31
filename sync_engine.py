@@ -387,8 +387,25 @@ def should_trigger_repo_check(count: int) -> bool:
         return count == milestones
     return count in [5, 15, 30, 60]
 
+def check_github_prerequisites() -> tuple[bool, str]:
+    """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
+    if shutil.which("gh") is None:
+        return False, "GitHub CLI ('gh') is not installed. offGIT requires GitHub CLI to operate. Install via: winget install GitHub.cli"
+
+    code, _, _ = run_cmd(["gh", "auth", "status"])
+    if code != 0:
+        return False, "GitHub CLI is not logged in. offGIT requires an authenticated GitHub session. Please run: gh auth login"
+
+    return True, ""
+
 def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
-    """Scaffolds and publishes a repository. Handles unauthenticated GitHub gracefully by initializing locally first."""
+    """Scaffolds and publishes a repository directly with the specified name in response to in-chat confirmation."""
+    ready, msg = check_github_prerequisites()
+    if not ready:
+        logger.error(f"offGIT repository creation blocked: {msg}")
+        print(f"[offGIT BLOCKED] {msg}")
+        return False
+
     p_path = Path(repo_path)
     p_path.mkdir(parents=True, exist_ok=True)
     clean_name = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in repo_name.lower()).strip("-")
@@ -470,28 +487,12 @@ Historical architectural decisions and technical trade-offs are documented conti
     ensure_gitignore(repo_path)
     ensure_tool_pointers(repo_path)
 
-    # 4. Local Git initialization & initial commit (Always succeeds locally)
+    # 4. Local Git initialization
     if not (p_path / ".git").exists():
         run_cmd(["git", "init"], cwd=repo_path)
         run_cmd(["git", "branch", "-M", "main"], cwd=repo_path)
 
-    run_cmd(["git", "add", "-A"], cwd=repo_path)
-    run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
-
-        # 5. Check if GitHub CLI is installed and in PATH
-    if shutil.which("gh") is None:
-        logger.warning(f"GitHub CLI ('gh') not found in PATH. Project scaffolded locally at {repo_path}.")
-        print(f"[offGIT] Local repository initialized and committed at '{repo_path}'.")
-        print(f"[offGIT] GitHub CLI ('gh') is not installed. To auto-publish repositories, install it via: winget install GitHub.cli")
-        return True
-
-    # 6. Check GitHub CLI authentication status
-    code_auth, out_auth, err_auth = run_cmd(["gh", "auth", "status"])
-    if code_auth != 0:
-        logger.warning(f"GitHub CLI is not authenticated. Project scaffolded locally at {repo_path}.")
-        print(f"[offGIT] Local repository created and committed at '{repo_path}'.")
-        print(f"[offGIT] GitHub CLI is not logged in. To publish to GitHub, run: gh auth login")
-        return Truegh_user = CONFIG.get("github_user", "")
+    gh_user = CONFIG.get("github_user", "")
     create_cmd = f"gh repo create {clean_name} --public --source . --remote origin --push" if not gh_user else f"gh repo create {gh_user}/{clean_name} --public --source . --remote origin --push"
     
     code, out, err = run_cmd(create_cmd, cwd=repo_path)
@@ -500,7 +501,8 @@ Historical architectural decisions and technical trade-offs are documented conti
         notify("Repository Created", f"Created and published {clean_name} on GitHub")
         return True
     else:
-        # Fallback manual push
+        run_cmd(["git", "add", "-A"], cwd=repo_path)
+        run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
         run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
         return True
 
@@ -569,6 +571,12 @@ def notify(title: str, message: str) -> None:
     subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def run_sync(repo_path: str, trigger_source: str) -> None:
+    ready, msg = check_github_prerequisites()
+    if not ready:
+        logger.warning(f"offGIT sync blocked: {msg}")
+        print(f"[offGIT BLOCKED] {msg}")
+        return
+
     if not repo_path or not os.path.exists(repo_path):
         logger.warning(f"Invalid repo_path passed to run_sync: {repo_path}")
         return
