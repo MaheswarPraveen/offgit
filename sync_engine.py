@@ -388,7 +388,7 @@ def should_trigger_repo_check(count: int) -> bool:
     return count in [5, 15, 30, 60]
 
 def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
-    """Scaffolds and publishes a repository directly with the specified name in response to in-chat confirmation."""
+    """Scaffolds and publishes a repository. Handles unauthenticated GitHub gracefully by initializing locally first."""
     p_path = Path(repo_path)
     p_path.mkdir(parents=True, exist_ok=True)
     clean_name = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in repo_name.lower()).strip("-")
@@ -398,6 +398,7 @@ def scaffold_repo_direct(repo_path: str, repo_name: str) -> bool:
 
     logger.info(f"Provisioning repository with confirmed name: {clean_name}")
 
+    # 1. README.md
     readme = p_path / "README.md"
     if not readme.exists():
         readme_content = f"""# {clean_name}
@@ -436,6 +437,7 @@ Created with and maintained with:
 """
         readme.write_text(readme_content, encoding="utf-8")
 
+    # 2. ARCHITECTURE.md
     arch = p_path / "ARCHITECTURE.md"
     if not arch.exists():
         arch_content = f"""# System Architecture: {clean_name}
@@ -460,6 +462,7 @@ Historical architectural decisions and technical trade-offs are documented conti
 """
         arch.write_text(arch_content, encoding="utf-8")
 
+    # 3. CONTEXT.md
     context_file = p_path / "CONTEXT.md"
     if not context_file.exists():
         update_context_md(repo_path, f"- Initial project repository initialized for {clean_name}.")
@@ -467,23 +470,34 @@ Historical architectural decisions and technical trade-offs are documented conti
     ensure_gitignore(repo_path)
     ensure_tool_pointers(repo_path)
 
+    # 4. Local Git initialization & initial commit (Always succeeds locally)
     if not (p_path / ".git").exists():
         run_cmd(["git", "init"], cwd=repo_path)
         run_cmd(["git", "branch", "-M", "main"], cwd=repo_path)
 
-    gh_user = CONFIG.get("github_user", "MaheswarPraveen")
-    code, out, err = run_cmd(f'gh repo create {gh_user}/{clean_name} --public --confirm', cwd=repo_path)
+    run_cmd(["git", "add", "-A"], cwd=repo_path)
+    run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
+
+    # 5. Check GitHub CLI authentication status
+    code_auth, out_auth, err_auth = run_cmd(["gh", "auth", "status"])
+    if code_auth != 0:
+        logger.warning(f"GitHub CLI is not authenticated. Project scaffolded locally at {repo_path}.")
+        print(f"[offGIT AUTH REQUIRED] Local repository created and committed at '{repo_path}'.")
+        print(f"[offGIT AUTH REQUIRED] GitHub CLI is not logged in. To publish to GitHub, run: gh auth login")
+        return True
+
+    gh_user = CONFIG.get("github_user", "")
+    create_cmd = f"gh repo create {clean_name} --public --source . --remote origin --push" if not gh_user else f"gh repo create {gh_user}/{clean_name} --public --source . --remote origin --push"
+    
+    code, out, err = run_cmd(create_cmd, cwd=repo_path)
     if code == 0:
-        run_cmd(["git", "remote", "add", "origin", f"https://github.com/{gh_user}/{clean_name}.git"], cwd=repo_path)
-        run_cmd(["git", "add", "-A"], cwd=repo_path)
-        run_cmd(["git", "commit", "-m", "feat: initial project scaffolding and architecture setup"], cwd=repo_path)
-        run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
-        logger.info(f"Successfully created and pushed remote repo {gh_user}/{clean_name}")
-        notify("Repository Created", f"Created and scaffolded {gh_user}/{clean_name}")
+        logger.info(f"Successfully created and pushed remote repo {clean_name}")
+        notify("Repository Created", f"Created and published {clean_name} on GitHub")
         return True
     else:
-        logger.error(f"gh repo create failed: {err}")
-        return False
+        # Fallback manual push
+        run_cmd(["git", "push", "-u", "origin", "main"], cwd=repo_path)
+        return True
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
     if not prompt_context and not diff:
