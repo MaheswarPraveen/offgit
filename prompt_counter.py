@@ -20,6 +20,16 @@ def is_gh_authenticated() -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+def is_already_github_repo(repo: Path) -> bool:
+    """Checks if the project is already an initialized git repository with a remote origin."""
+    if not (repo / ".git").exists():
+        return False
+    try:
+        res = subprocess.run(["git", "remote", "get-url", "origin"], cwd=str(repo), capture_output=True, text=True, timeout=3)
+        return res.returncode == 0 and bool(res.stdout.strip())
+    except Exception:
+        return False
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=str, required=True)
@@ -77,13 +87,17 @@ def main():
 
     # 4. Check milestone
     if count in MILESTONES:
-        authed, auth_msg = is_gh_authenticated()
-        if not authed:
-            print(f"[offGIT AUTH REQUIRED] Milestone {count} reached on '{repo.name}'. {auth_msg} Run 'gh auth login' to connect your GitHub account.")
+        if is_already_github_repo(repo):
+            # Repository is already created and synced to GitHub! Do not prompt again.
+            print(f"[offGIT] Logged prompt #{count} for '{repo.name}'. (GitHub repository active)")
         else:
-            words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
-            sug_name = "-".join(words) or repo.name.lower()
-            print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
+            authed, auth_msg = is_gh_authenticated()
+            if not authed:
+                print(f"[offGIT AUTH REQUIRED] Milestone {count} reached on '{repo.name}'. {auth_msg} Run 'gh auth login' to connect your GitHub account.")
+            else:
+                words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
+                sug_name = "-".join(words) or repo.name.lower()
+                print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
     else:
         print(f"[offGIT] Logged prompt #{count} for '{repo.name}'.")
 

@@ -22,13 +22,14 @@ class IdleEventHandler(FileSystemEventHandler):
             return
 
         ext = Path(event.src_path).suffix.lower()
-        if ext in self.extensions:
-            if ".offgit" in event.src_path or ".git" in event.src_path:
+        if ext in self.extensions or event.src_path.endswith("CONTEXT.md"):
+            if ".git" in event.src_path.split(os.sep):
                 return
 
             repo_dir = self.find_repo_root(event.src_path)
-            self.active_repos.add(repo_dir)
-            logger.debug(f"File modification in {event.src_path} (repo: {repo_dir})")
+            if repo_dir:
+                self.active_repos.add(repo_dir)
+                logger.debug(f"File modification in {event.src_path} (repo: {repo_dir})")
 
     def find_repo_root(self, file_path: str) -> str:
         cur = Path(file_path).resolve().parent
@@ -38,27 +39,56 @@ class IdleEventHandler(FileSystemEventHandler):
             cur = cur.parent
         return str(Path(file_path).parent)
 
+def discover_watched_repos() -> set[str]:
+    """Finds all existing git/offgit project directories under watched_directories."""
+    repos = set()
+    for base in CONFIG.get("watched_directories", []):
+        base_p = Path(base)
+        if not base_p.exists():
+            continue
+        # Check base itself
+        if (base_p / ".git").exists() or (base_p / ".offgit").exists():
+            repos.add(str(base_p))
+        # Check 1 level of subdirectories (e.g. scratch/<project>)
+        try:
+            for child in base_p.iterdir():
+                if child.is_dir() and ((child / ".git").exists() or (child / ".offgit").exists()):
+                    repos.add(str(child))
+        except Exception as e:
+            logger.debug(f"Error scanning {base}: {e}")
+    return repos
+
 def devlog_10min_batch_loop(handler: IdleEventHandler):
     interval = CONFIG.get("devlog_interval_seconds", 600)
     logger.info(f"10-minute batch sync loop started (interval: {interval}s)")
 
     while True:
-        time.sleep(interval)
-        ready, msg = check_github_prerequisites()
-        if not ready:
-            logger.warning(f"Batch sync paused: {msg}")
-            continue
+        try:
+            time.sleep(interval)
+            ready, msg = check_github_prerequisites()
+            if not ready:
+                logger.warning(f"10-minute batch sync paused: {msg}")
+                continue
 
-        repos = list(handler.active_repos)
-        for repo in repos:
-            try:
-                diff = get_diff(repo)
-                prompts = read_prompt_log(repo)
-                if diff.strip() or prompts:
-                    logger.info(f"Firing 10-minute consolidated batch sync for: {repo}")
-                    run_sync(repo, "watcher")
-            except Exception as e:
-                logger.error(f"Error in 10-minute batch sync on {repo}: {e}")
+            # Merge event-detected repos with discovered project directories
+            all_candidate_repos = set(handler.active_repos).union(discover_watched_repos())
+            handler.active_repos.clear()
+
+            synced_count = 0
+            for repo in all_candidate_repos:
+                try:
+                    diff = get_diff(repo)
+                    prompts = read_prompt_log(repo)
+                    if diff.strip() or prompts:
+                        logger.info(f"Firing 10-minute batch sync for: {repo}")
+                        run_sync(repo, "watcher")
+                        synced_count += 1
+                except Exception as e:
+                    logger.error(f"Error in 10-minute batch sync on {repo}: {e}")
+
+            logger.info(f"Completed 10-minute batch sync cycle (scanned {len(all_candidate_repos)} repos, synced {synced_count}).")
+        except Exception as loop_err:
+            logger.error(f"Error in batch loop iteration: {loop_err}")
 
 def main():
     ready, msg = check_github_prerequisites()
@@ -69,7 +99,9 @@ def main():
 
     logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
     dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
-    exts = CONFIG.get("watched_extensions", [".ino", ".gd", ".py", ".ts", ".cpp", ".h"])
+    exts = CONFIG.get("watched_extensions", [
+        ".ino", ".gd", ".py", ".ts", ".cpp", ".h", ".js", ".c", ".hpp", ".tscn", ".md", ".json", ".txt"
+    ])
 
     if not dirs:
         logger.warning("No valid watched_directories found in config.yaml.")
