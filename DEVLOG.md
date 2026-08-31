@@ -14,3 +14,9 @@ Automated continuity log maintained by offGIT.
 - Directive: testing already published repo milestone check
 - Rationale: Verification test
 - Applied workspace modifications (+0/-0 lines).
+
+## 2026-08-31 16:06:29 - AI-assisted (Antigravity)
+
+- Directive: Implement dual-channel 10-minute ambient sync: casual thoughts to thoughts repo, code to project repo
+- Rationale: Designing autonomous 10-minute batch pipeline that routes conversational thoughts to thoughts repo and technical code diffs to project repo
+- Updated `CONTEXT.md` (+3/-9 lines).
