@@ -78,7 +78,7 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 ## Automatic Instructions for Every Session
 
 1. **Dedicated Project Subdirectory**:
-   - When the user starts a project or discusses a concept (e.g. ESP32, Godot game, web app), ensure work is associated with a dedicated subdirectory (e.g. `C:\Users\xczma\.gemini\antigravity\scratch\<project-name>`).
+   - When the user starts a project or discusses a concept (e.g. ESP32, Godot game, web app), ensure work is associated with a dedicated subdirectory (e.g. `$scratchDir\<project-name>`).
 
 2. **Context Ingestion on Startup**:
    - If a `CONTEXT.md` file exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
