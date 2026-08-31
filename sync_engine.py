@@ -659,12 +659,44 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
     commit_and_push(repo_path)
     classify_thought(diff, prompt_context, trigger_source)
 
+def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
+    """Performs automated self-healing diagnostics and prints known error patterns from FIXES.md."""
+    print("===================================================")
+    print("      offGIT Self-Healing Diagnostics & Fixes      ")
+    print("===================================================")
+
+    # 1. Check prerequisites
+    ready, msg = check_github_prerequisites()
+    if ready:
+        print("[OK] GitHub CLI is installed and authenticated.")
+    else:
+        print(f"[FAIL] {msg}")
+
+    # 2. Check background daemon status
+    res_ps = run_cmd(["powershell", "-NoProfile", "-Command", "Get-Process -Name pythonw -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"])
+    if res_ps[0] == 0 and res_ps[1].strip():
+        print(f"[OK] Background watcher daemon is running (PID: {res_ps[1].strip()}).")
+    else:
+        print("[WARNING] Background watcher daemon is not running. Attempting auto-restart...")
+        vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
+        if vbs_path.exists():
+            run_cmd(["wscript.exe", str(vbs_path)])
+            print("[OK] Restarted background watcher daemon.")
+
+    # 3. Print FIXES.md summary
+    fixes_file = Path.home() / ".offgit" / "FIXES.md"
+    if fixes_file.exists():
+        print("\n--- Canonical Error Signatures & Fixes (FIXES.md) ---")
+        print(fixes_file.read_text(encoding="utf-8"))
+
 def main():
     parser = argparse.ArgumentParser(description="offGIT Core Engine")
     parser.add_argument("--repo", type=str, help="Path to project repository")
     parser.add_argument("--trigger", type=str, default="cli", help="Trigger source identifier")
     parser.add_argument("--log-prompt", action="store_true", help="Append an entry to prompt-log.jsonl")
     parser.add_argument("--scaffold", action="store_true", help="Scaffold and create GitHub repository")
+    parser.add_argument("--fix", action="store_true", help="Run self-healing diagnostics and display FIXES.md error reference")
+    parser.add_argument("--diagnose", action="store_true", help="Alias for --fix")
     parser.add_argument("--name", type=str, default="", help="Repository name for scaffolding")
     parser.add_argument("--visibility", type=str, default="", help="Repository visibility: private or public")
     parser.add_argument("--tool", type=str, default="cli", help="Tool name for prompt logging")
@@ -672,6 +704,10 @@ def main():
     parser.add_argument("--thinking", type=str, default="", help="AI thinking / architecture explanation")
 
     args = parser.parse_args()
+
+    if args.fix or args.diagnose:
+        run_self_healing_diagnostics(args.repo)
+        return
 
     if args.scaffold and args.repo:
         name = args.name or Path(args.repo).name
