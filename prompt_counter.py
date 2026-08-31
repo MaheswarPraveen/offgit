@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 MILESTONES = {5, 15, 30, 60}
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 def is_gh_authenticated() -> tuple[bool, str]:
     if shutil.which("gh") is None:
         return False, "GitHub CLI ('gh') is not installed."
     try:
-        res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=3)
+        res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=3, creationflags=NO_WINDOW)
         if res.returncode == 0:
             return True, ""
         return False, "GitHub CLI is not logged in."
@@ -25,7 +26,7 @@ def is_already_github_repo(repo: Path) -> bool:
     if not (repo / ".git").exists():
         return False
     try:
-        res = subprocess.run(["git", "remote", "get-url", "origin"], cwd=str(repo), capture_output=True, text=True, timeout=3)
+        res = subprocess.run(["git", "remote", "get-url", "origin"], cwd=str(repo), capture_output=True, text=True, timeout=3, creationflags=NO_WINDOW)
         return res.returncode == 0 and bool(res.stdout.strip())
     except Exception:
         return False
@@ -88,7 +89,6 @@ def main():
     # 4. Check milestone
     if count in MILESTONES:
         if is_already_github_repo(repo):
-            # Repository is already created and synced to GitHub! Do not prompt again.
             print(f"[offGIT] Logged prompt #{count} for '{repo.name}'. (GitHub repository active)")
         else:
             authed, auth_msg = is_gh_authenticated()

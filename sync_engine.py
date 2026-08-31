@@ -81,8 +81,9 @@ def strip_emojis(text: str) -> str:
     return text.encode("ascii", "ignore").decode("ascii")
 
 def run_cmd(cmd: list[str] | str, cwd: str | None = None, timeout: int = 30) -> tuple[int, str, str]:
-    """Executes a command safely with list args (shell=False) and strict timeout protection."""
+    """Executes a command safely with zero console window popups (CREATE_NO_WINDOW) and strict timeouts."""
     is_list = isinstance(cmd, list)
+    no_window_flag = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     try:
         res = subprocess.run(
             cmd,
@@ -92,7 +93,8 @@ def run_cmd(cmd: list[str] | str, cwd: str | None = None, timeout: int = 30) -> 
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=timeout
+            timeout=timeout,
+            creationflags=no_window_flag
         )
         return res.returncode, res.stdout.strip(), res.stderr.strip()
     except subprocess.TimeoutExpired as te:
@@ -603,10 +605,11 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str) -> None:
             logger.warning(f"Could not push thought {filename} to remote thoughts repo: {err_p}")
 
 def notify(title: str, message: str) -> None:
-    """Cross-platform notification provider supporting Windows, macOS, and Linux."""
-    clean_title = strip_emojis(title).replace("'", "''").replace('"', '\\"')
-    clean_msg = strip_emojis(message).replace("'", "''").replace('"', '\\"')
+    """Cross-platform notification provider supporting Windows, macOS, and Linux without console popups."""
+    clean_title = strip_emojis(title).replace("'", "''").replace('"', '\"')
+    clean_msg = strip_emojis(message).replace("'", "''").replace('"', '\"')
     current_os = platform.system()
+    no_window_flag = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
     try:
         if current_os == "Windows":
@@ -619,7 +622,7 @@ def notify(title: str, message: str) -> None:
                 f"$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
                 f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('offGIT').Show($toast);"
             )
-            subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=no_window_flag)
         elif current_os == "Darwin":
             osa_cmd = f'display notification "{clean_msg}" with title "{clean_title}"'
             subprocess.Popen(["osascript", "-e", osa_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
