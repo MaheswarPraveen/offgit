@@ -2,11 +2,18 @@ import os
 import sys
 import time
 import shutil
-import threading
 import logging
+import threading
+import traceback
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+# Ensure safe stdout/stderr when running as background daemon (pythonw)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 sys.path.insert(0, str(Path.home() / ".offgit"))
 from sync_engine import CONFIG, run_sync, get_diff, read_prompt_log, check_github_prerequisites, logger
@@ -40,16 +47,13 @@ class IdleEventHandler(FileSystemEventHandler):
         return str(Path(file_path).parent)
 
 def discover_watched_repos() -> set[str]:
-    """Finds all existing git/offgit project directories under watched_directories."""
     repos = set()
     for base in CONFIG.get("watched_directories", []):
         base_p = Path(base)
         if not base_p.exists():
             continue
-        # Check base itself
         if (base_p / ".git").exists() or (base_p / ".offgit").exists():
             repos.add(str(base_p))
-        # Check 1 level of subdirectories (e.g. scratch/<project>)
         try:
             for child in base_p.iterdir():
                 if child.is_dir() and ((child / ".git").exists() or (child / ".offgit").exists()):
@@ -70,7 +74,6 @@ def devlog_10min_batch_loop(handler: IdleEventHandler):
                 logger.warning(f"10-minute batch sync paused: {msg}")
                 continue
 
-            # Merge event-detected repos with discovered project directories
             all_candidate_repos = set(handler.active_repos).union(discover_watched_repos())
             handler.active_repos.clear()
 
@@ -88,42 +91,40 @@ def devlog_10min_batch_loop(handler: IdleEventHandler):
 
             logger.info(f"Completed 10-minute batch sync cycle (scanned {len(all_candidate_repos)} repos, synced {synced_count}).")
         except Exception as loop_err:
-            logger.error(f"Error in batch loop iteration: {loop_err}")
+            logger.error(f"Error in batch loop iteration: {loop_err}\n{traceback.format_exc()}")
 
 def main():
-    ready, msg = check_github_prerequisites()
-    if not ready:
-        logger.error(f"Cannot start offGIT Watcher: {msg}")
-        print(f"[offGIT BLOCKED] {msg}")
-        return
-
-    logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
-    dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
-    exts = CONFIG.get("watched_extensions", [
-        ".ino", ".gd", ".py", ".ts", ".cpp", ".h", ".js", ".c", ".hpp", ".tscn", ".md", ".json", ".txt"
-    ])
-
-    if not dirs:
-        logger.warning("No valid watched_directories found in config.yaml.")
-        return
-
-    handler = IdleEventHandler(exts)
-    observer = Observer()
-
-    for d in dirs:
-        logger.info(f"Watching directory: {d}")
-        observer.schedule(handler, d, recursive=True)
-
-    loop_thread = threading.Thread(target=devlog_10min_batch_loop, args=(handler,), daemon=True)
-    loop_thread.start()
-
-    observer.start()
     try:
+        ready, msg = check_github_prerequisites()
+        if not ready:
+            logger.error(f"Cannot start offGIT Watcher: {msg}")
+            return
+
+        logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
+        dirs = [d for d in CONFIG.get("watched_directories", []) if os.path.exists(d)]
+        exts = CONFIG.get("watched_extensions", [
+            ".ino", ".gd", ".py", ".ts", ".cpp", ".h", ".js", ".c", ".hpp", ".tscn", ".md", ".json", ".txt"
+        ])
+
+        if not dirs:
+            logger.warning("No valid watched_directories found in config.yaml.")
+            return
+
+        handler = IdleEventHandler(exts)
+        observer = Observer()
+
+        for d in dirs:
+            logger.info(f"Watching directory: {d}")
+            observer.schedule(handler, d, recursive=True)
+
+        loop_thread = threading.Thread(target=devlog_10min_batch_loop, args=(handler,), daemon=True)
+        loop_thread.start()
+
+        observer.start()
         while True:
             time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    except Exception as e:
+        logger.error(f"FATAL crash in watcher: {e}\n{traceback.format_exc()}")
 
 if __name__ == "__main__":
     main()
