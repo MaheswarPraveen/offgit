@@ -50,3 +50,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Eliminate hardcoded paths and user references: implement dynamic home-directory resolution (~), automatic gh username detection, and harness directory discovery
 - Rationale: Refactoring config.yaml, sync_engine.py, and watcher.py to dynamically expand user home directories and detect GitHub user credentials without leaking hardcoded folder names
 - Applied workspace modifications (+0/-0 lines).
+
+## 2026-09-01 16:27:55 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Add native support for OpenCode AI terminal assistant: source attribution, OPENCODE.md context pointer, and rule deployment
+- Rationale: Integrating OpenCode into offGIT: adding OpenCode source attribution, OPENCODE.md rule generation, hook configuration, and documentation
+- Applied workspace modifications (+0/-0 lines).
