@@ -128,3 +128,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Add native support for OpenCode AI terminal assistant: source attribution, OPENCODE.md context pointer, and rule deployment
 - Rationale: Integrating OpenCode into offGIT: adding OpenCode source attribution, OPENCODE.md rule generation, hook configuration, and documentation
 - Applied workspace modifications (+0/-0 lines).
+
+## 2026-09-01 17:57:08 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Add native support for OpenCode AI terminal assistant: source attribution, OPENCODE.md context pointer, and rule deployment
+- Rationale: Integrating OpenCode into offGIT: adding OpenCode source attribution, OPENCODE.md rule generation, hook configuration, and documentation
+- Applied workspace modifications (+0/-0 lines).
