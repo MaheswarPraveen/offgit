@@ -568,8 +568,41 @@ def clean_prompt_summary(text: str) -> str:
     cleaned = " ".join(cleaned.split()).strip()
     return cleaned
 
+def is_genuine_architectural_thought(summary: str, thinking: str) -> bool:
+    """Filters out casual chit-chat and meta-queries to ensure only real technical decisions reach thoughts."""
+    s = summary.lower().strip()
+    t = thinking.strip()
+
+    # Reject empty or very short messages
+    if len(s) < 12:
+        return False
+
+    # Filter out common conversational and meta chatter
+    trash_triggers = [
+        "hi", "hello", "hey", "cool", "yes", "no", "ok", "okay", "yeah", "nope",
+        "why didn", "what about my", "are these", "tell me", "check the",
+        "where are", "do 2nd", "is it uploaded", "we dont need", "no no",
+        "dont download", "thoughts in git", "what we talking", "what now",
+        "whats happening", "can you tell", "look into that", "dude", "thanks"
+    ]
+    if any(k in s for k in trash_triggers):
+        # Only allow through if there is substantial architectural thinking attached
+        if len(t) < 50:
+            return False
+
+    # Valid thought if it has substantial technical rationale or technical directive keywords
+    technical_keywords = [
+        "implement", "refactor", "design", "architecture", "kinematics", "firmware",
+        "algorithm", "controller", "protocol", "hardware", "schema", "optimize",
+        "state", "service", "interface", "driver", "model", "pipeline", "security"
+    ]
+    has_tech_kw = any(k in s for k in technical_keywords)
+    has_thinking = len(t) >= 30
+
+    return has_tech_kw or has_thinking
+
 def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
-    """Consolidates session prompts and diff into a single structured architectural note every batch interval (5-10m)."""
+    """Ingests ONLY genuine, unique technical decisions into the private thoughts repo with strict anti-spam deduplication."""
     if not prompt_context and not diff:
         return
 
@@ -592,7 +625,7 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         proj_name = Path(repo_path).name if repo_path else "general"
         proj_slug = "".join(c if c.isalnum() else "-" for c in proj_name.lower()).strip("-")
 
-        # Collect only new, meaningful entries since last sync
+        # Collect only genuine, un-synced architectural directives
         valid_entries = []
         latest_processed_ts = last_sync_ts
 
@@ -606,7 +639,10 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
             thinking = entry.get("ai_thinking", "").strip()
             entry_tool = entry.get("tool", tool)
 
-            if not summary or len(summary) < 8 or summary.lower() in ["hi", "hello", "hey", "cool", "yes", "no", "ok", "okay"]:
+            if entry_ts > latest_processed_ts:
+                latest_processed_ts = entry_ts
+
+            if not is_genuine_architectural_thought(summary, thinking):
                 continue
 
             valid_entries.append({
@@ -615,64 +651,56 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
                 "summary": summary,
                 "thinking": thinking
             })
-            if entry_ts > latest_processed_ts:
-                latest_processed_ts = entry_ts
 
-        # If no new chat prompts, ingest active state from CONTEXT.md
+        # Update last sync timestamp even if no thoughts qualified, so we don't re-scan trivial chatter
+        if ts_file and latest_processed_ts:
+            ts_file.write_text(latest_processed_ts, encoding="utf-8")
+
+        # STRICT ANTI-SPAM RULE: If no genuine architectural thoughts, DO NOT generate any document!
         if not valid_entries:
-            active_focus = "Ongoing project development and maintenance"
-            if repo_path:
-                ctx_file = Path(repo_path) / "CONTEXT.md"
-                if ctx_file.exists():
-                    try:
-                        for line in ctx_file.read_text(encoding="utf-8").splitlines():
-                            if line.startswith("- Directive:"):
-                                active_focus = line.replace("- Directive:", "").strip()
-                                break
-                    except Exception:
-                        pass
+            return
 
-            valid_entries.append({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "tool": trigger_source if 'trigger_source' in locals() else tool,
-                "summary": active_focus,
-                "thinking": "Automated 5-minute periodic sync checkpoint"
-            })
-
-        # Derive overarching session topic from most substantial entry
+        # Derive clean topic slug without minute timestamps (prevents duplicate spam files)
         primary_entry = valid_entries[-1]
         primary_summary = primary_entry["summary"]
         words = "".join(c if c.isalnum() else " " for c in primary_summary.lower()).split()[:5]
-        topic_slug = "-".join(words) or "periodic-checkpoint"
+        topic_slug = "-".join(words) or "architecture-decision"
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         time_str = datetime.now().strftime("%H:%M")
-        time_compact = datetime.now().strftime("%H%M")
-        filename = f"{date_str}_{proj_slug}_{time_compact}_{topic_slug}.md"
+        filename = f"{date_str}_{proj_slug}_{topic_slug}.md"
         file_path = thoughts_repo / filename
 
-        # Construct single consolidated session document
+        # Construct or append to clean architecture document
         title_text = primary_summary[:80] + ("..." if len(primary_summary) > 80 else "")
-        content = f"# Technical Session: {title_text}\n\n"
-        content += f"- **Date / Time**: `{date_str} {time_str}`\n"
+        content = f"# Architecture Decision: {title_text}\n\n"
+        content += f"- **Date**: `{date_str} {time_str}`\n"
         content += f"- **Project**: `{proj_name}`\n"
-        content += f"- **Batched Directives**: `{len(valid_entries)} prompt(s) / checkpoint(s) processed`\n\n"
+        content += f"- **Tool**: `{primary_entry['tool']}`\n\n"
         content += "---\n\n"
 
-        content += "## 1. Directives & Ingested Context\n\n"
-        for i, ve in enumerate(valid_entries, 1):
-            content += f"### Directive {i} (`{ve['tool']}`)\n"
-            content += f"**Prompt**: {ve['summary']}\n\n"
-            if ve['thinking']:
-                content += f"**Architectural Rationale**:\n> {ve['thinking']}\n\n"
+        content += "## Problem & Directive\n\n"
+        content += f"{primary_summary}\n\n"
+
+        if primary_entry['thinking']:
+            content += "## AI Architectural Reasoning\n\n"
+            content += f"{primary_entry['thinking']}\n\n"
+
+        if len(valid_entries) > 1:
+            content += "## Supporting Directives in Session\n\n"
+            for ve in valid_entries[:-1]:
+                content += f"- **[{ve['tool']}]** {ve['summary']}\n"
+                if ve['thinking']:
+                    content += f"  *Rationale:* {ve['thinking']}\n"
+            content += "\n"
 
         if diff:
-            content += "## 2. Accompanying Code Changes\n\n"
+            content += "## Accompanying Code Diff\n\n"
             content += f"```diff\n{diff[:3000]}\n```\n"
 
         file_path.write_text(strip_emojis(content), encoding="utf-8")
 
-        # Rebuild structured chronological index table
+        # Rebuild clean, deduplicated chronological index table
         readme_path = thoughts_repo / "README.md"
         all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
         table_rows = []
@@ -701,7 +729,7 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
 
         # Commit and push
         run_cmd(["git", "add", "-A"], cwd=str(thoughts_repo), timeout=10)
-        commit_msg = f"docs(thoughts): record session summary for {proj_name} ({date_str} {time_str})"
+        commit_msg = f"docs(thoughts): record architecture decision for {proj_name}"
         run_cmd(["git", "commit", "-m", commit_msg], cwd=str(thoughts_repo), timeout=10)
 
         code_r, remote_out, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=str(thoughts_repo), timeout=5)
@@ -711,10 +739,7 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
                 run_cmd(["git", "rebase", "--abort"], cwd=str(thoughts_repo), timeout=10)
                 return
             run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
-            logger.info(f"Auto-synced session thought to private thoughts repo.")
-
-        if ts_file and latest_processed_ts:
-            ts_file.write_text(latest_processed_ts, encoding="utf-8")
+            logger.info(f"Auto-synced genuine architecture decision to private thoughts repo.")
 
     except Exception as e:
         logger.error(f"Error in classify_thought: {e}", exc_info=True)

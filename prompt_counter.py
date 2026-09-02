@@ -11,10 +11,33 @@ MILESTONES = {5, 15, 30, 60}
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 def is_gh_authenticated() -> tuple[bool, str]:
+    """Fast, local-first check for GitHub authentication that avoids network timeouts."""
     if shutil.which("gh") is None:
         return False, "GitHub CLI ('gh') is not installed."
+
+    # 1. Fast local token check (sub-100ms, reads local config without network lag)
     try:
-        res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=3, creationflags=NO_WINDOW)
+        res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=2, creationflags=NO_WINDOW)
+        if res.returncode == 0 and res.stdout.strip():
+            return True, ""
+    except Exception:
+        pass
+
+    # 2. Check local hosts.yml config directly (< 1ms)
+    try:
+        config_paths = [
+            Path(os.environ.get("APPDATA", "")) / "GitHub CLI" / "hosts.yml",
+            Path.home() / ".config" / "gh" / "hosts.yml"
+        ]
+        for cp in config_paths:
+            if cp.exists() and ("oauth_token" in cp.read_text(encoding="utf-8", errors="ignore") or "user:" in cp.read_text(encoding="utf-8", errors="ignore")):
+                return True, ""
+    except Exception:
+        pass
+
+    # 3. Fallback to status with generous 8s timeout
+    try:
+        res = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=8, creationflags=NO_WINDOW)
         if res.returncode == 0:
             return True, ""
         return False, "GitHub CLI is not logged in."
@@ -91,13 +114,18 @@ def main():
         if is_already_github_repo(repo):
             print(f"[offGIT] Logged prompt #{count} for '{repo.name}'. (GitHub repository active)")
         else:
+            # Generate clean suggested name from project or directive
+            words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
+            sug_name = "-".join(words) or repo.name.lower()
+            if len(sug_name) > 30:
+                sug_name = repo.name.lower()
+
+            # Always present milestone question directly in chat
             authed, auth_msg = is_gh_authenticated()
-            if not authed:
-                print(f"[offGIT AUTH REQUIRED] Milestone {count} reached on '{repo.name}'. {auth_msg} Run 'gh auth login' to connect your GitHub account.")
-            else:
-                words = "".join(c if c.isalnum() else " " for c in summary.lower()).split()[:3]
-                sug_name = "-".join(words) or repo.name.lower()
+            if authed:
                 print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to create a GitHub repo for '{sug_name}'?")
+            else:
+                print(f"[offGIT MILESTONE {count}] Suggested repo: '{sug_name}'. Question: Looks like we reached milestone {count} on '{repo.name}' - want me to connect your GitHub and create repo '{sug_name}'?")
     else:
         print(f"[offGIT] Logged prompt #{count} for '{repo.name}'.")
 
