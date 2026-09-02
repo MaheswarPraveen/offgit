@@ -17,7 +17,7 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 sys.path.insert(0, str(Path.home() / ".offgit"))
-from sync_engine import CONFIG, run_sync, get_diff, read_prompt_log, check_github_prerequisites, logger
+from sync_engine import CONFIG, run_sync, get_diff, read_prompt_log, get_unsynced_prompts, check_github_prerequisites, logger
 
 class IdleEventHandler(FileSystemEventHandler):
     def __init__(self, extensions):
@@ -102,8 +102,8 @@ def devlog_10min_batch_loop(handler: IdleEventHandler):
             for repo in all_candidate_repos:
                 try:
                     diff = get_diff(repo)
-                    prompts = read_prompt_log(repo)
-                    if diff.strip() or prompts:
+                    unsynced_prompts = get_unsynced_prompts(repo)
+                    if diff.strip() or unsynced_prompts:
                         logger.info(f"Firing 10-minute batch sync for: {repo}")
                         run_sync(repo, "watcher")
                         synced_count += 1

@@ -470,3 +470,10 @@ Automated continuity log maintained by offGIT.
 
 - Directive: Display and sync latest DEVLOG.md for offgit
 - Rationale: Inspecting DEVLOG.md in project root and running sync if needed to ensure all latest audit hardening entries are reflected
+
+## 2026-09-02 15:46:58 - Source (test)
+
+- Directive: Harden activity detection: prevent empty commits and devlog spam when there is zero activity
+- Rationale: Implementing watermark timestamp in .offgit/last-devlog-sync.ts to strictly prevent sync_engine and watcher from creating empty commits or updating DEVLOG.md when no code diff or new prompts exist
+- Updated `CONTEXT.md`, `sync_engine.py`, `watcher.py` (+44/-24 lines).
+- Key changes: def get_unsynced_prompts(repo_path: str) -> list[dict]:; def update_last_devlog_sync_ts(repo_path: str, ts: str = "") -> None:

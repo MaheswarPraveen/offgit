@@ -208,6 +208,36 @@ def read_prompt_log(repo_path: str) -> list[dict]:
 
     return entries[-10:]
 
+def get_unsynced_prompts(repo_path: str) -> list[dict]:
+    """Returns only prompt log entries that occurred after the last devlog sync watermark."""
+    prompts = read_prompt_log(repo_path)
+    if not prompts:
+        return []
+
+    ts_file = Path(repo_path) / ".offgit" / "last-devlog-sync.ts"
+    if not ts_file.exists():
+        return prompts
+
+    try:
+        last_sync_ts = ts_file.read_text(encoding="utf-8").strip()
+    except Exception:
+        return prompts
+
+    if not last_sync_ts:
+        return prompts
+
+    return [p for p in prompts if p.get("ts", "") > last_sync_ts]
+
+def update_last_devlog_sync_ts(repo_path: str, ts: str = "") -> None:
+    """Updates the watermark timestamp indicating the latest synced activity."""
+    try:
+        ts_file = Path(repo_path) / ".offgit" / "last-devlog-sync.ts"
+        ts_file.parent.mkdir(parents=True, exist_ok=True)
+        now_ts = ts or datetime.now(timezone.utc).isoformat()
+        ts_file.write_text(now_ts, encoding="utf-8")
+    except Exception as e:
+        logger.debug(f"Could not update last-devlog-sync.ts: {e}")
+
 def append_prompt_log(repo_path: str, tool: str, summary: str, ai_thinking: str = "") -> int:
     off_dir = Path(repo_path) / ".offgit"
     off_dir.mkdir(parents=True, exist_ok=True)
@@ -841,21 +871,24 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
         return
 
     try:
-        logger.info(f"Running offGIT sync on {repo_path} (trigger: {trigger_source})")
-
         diff = get_diff(repo_path)
-        prompt_context = read_prompt_log(repo_path)
+        unsynced_prompts = get_unsynced_prompts(repo_path)
 
-        if not diff and not prompt_context:
-            logger.info(f"No diff and no prompt context in {repo_path}, skipping sync.")
+        # STRICT ZERO-ACTIVITY GATE: If there are no code changes and no new user directives, do nothing!
+        if not diff.strip() and not unsynced_prompts:
+            logger.debug(f"Zero new activity in {repo_path} (diff empty, 0 new prompts). Skipping sync.")
             return
 
+        logger.info(f"Running offGIT sync on {repo_path} (trigger: {trigger_source})")
+
+        prompt_context = unsynced_prompts or read_prompt_log(repo_path)
         summary = summarize_with_llm(diff, prompt_context, trigger_source)
 
         write_devlog(repo_path, summary, trigger_source)
         update_context_md(repo_path, summary)
         commit_and_push(repo_path)
         classify_thought(diff, prompt_context, trigger_source, repo_path)
+        update_last_devlog_sync_ts(repo_path)
     finally:
         _release_repo_lock(repo_path, fd)
 
