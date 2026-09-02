@@ -248,7 +248,7 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
     )
 
     # Safe list execution (shell=False) with strict 15s timeout
-    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
+    if cli_cmd and shutil.which(cli_cmd) and cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, err = run_cmd([cli_cmd, "-p", prompt[:4000]], timeout=15)
         if code == 0 and out.strip():
             return strip_emojis(out.strip())
@@ -302,7 +302,7 @@ def phrase_repo_question(prompt_log: list[dict], project_hint: str, tool: str) -
         "Rules: No emojis. Plain ASCII text only. Output ONLY the question."
     )
 
-    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
+    if cli_cmd and shutil.which(cli_cmd) and cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, _ = run_cmd([cli_cmd, "-p", prompt[:2000]], timeout=10)
         if code == 0 and out.strip():
             clean_q = strip_emojis(out.strip()).strip('"').strip("'")
@@ -325,7 +325,7 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
         "Rules: Output ONLY the lowercase kebab-case name (e.g. 'esp32-sensor-relay'). No quotes, no markdown."
     )
 
-    if cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
+    if cli_cmd and shutil.which(cli_cmd) and cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
         code, out, _ = run_cmd([cli_cmd, "-p", prompt[:2000]], timeout=10)
         if code == 0 and out.strip():
             candidate = strip_emojis(out.strip()).strip('"').strip("'").lower()
