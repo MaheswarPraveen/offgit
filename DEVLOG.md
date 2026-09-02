@@ -483,3 +483,9 @@ Automated continuity log maintained by offGIT.
 - Directive: look at my account and give an overview
 - Rationale: Querying GitHub CLI API to inspect authenticated account profile, public and private repositories, activity, and overall portfolio structure
 - Updated `CONTEXT.md` (+3/-18 lines).
+
+## 2026-09-02 16:03:34 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Explain how GitHub Pages portfolio websites work before taking action
+- Rationale: Explaining the architecture, mechanics, and hosting model of GitHub Pages (username.github.io) for an interactive robotics portfolio
+- Updated `CONTEXT.md` (+3/-17 lines).

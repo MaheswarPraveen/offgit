@@ -1,17 +1,15 @@
 # Live Project Context: offgit
 
-**Last Synced:** 2026-09-02 15:52:47
+**Last Synced:** 2026-09-02 16:03:34
 
 ## Current Focus & Active State
 
-- Directive: look at my account and give an overview
-- Rationale: Querying GitHub CLI API to inspect authenticated account profile, public and private repositories, activity, and overall portfolio structure
-- Updated `CONTEXT.md` (+3/-18 lines).
+- Directive: Explain how GitHub Pages portfolio websites work before taking action
+- Rationale: Explaining the architecture, mechanics, and hosting model of GitHub Pages (username.github.io) for an interactive robotics portfolio
+- Updated `CONTEXT.md` (+3/-17 lines).
 
 ## Recent Context Stream
 
-- **[antigravity]** (2026-09-02 06:10:57): Launch 7 parallel verification subagents to audit the entire offGIT codebase for zero-margin fresh-install correctness
-  *Rationale:* Spawning 7 independent subagents each targeting a specific failure domain: syntax/imports, Windows installer, macOS/Linux installer, config/path resolution, documentation, sync engine logic, and watch
 - **[antigravity]** (2026-09-02 06:17:36): Display and sync latest DEVLOG.md for offgit
   *Rationale:* Inspecting DEVLOG.md in project root and running sync if needed to ensure all latest audit hardening entries are reflected
 - **[antigravity]** (2026-09-02 10:15:30): Harden activity detection: prevent empty commits and devlog spam when there is zero activity
@@ -20,6 +18,8 @@
   *Rationale:* Evaluating GitHub contribution activity impact: genuine engineering signal vs automated commit spam perception
 - **[antigravity]** (2026-09-02 10:21:12): look at my account and give an overview
   *Rationale:* Querying GitHub CLI API to inspect authenticated account profile, public and private repositories, activity, and overall portfolio structure
+- **[antigravity]** (2026-09-02 10:29:34): Explain how GitHub Pages portfolio websites work before taking action
+  *Rationale:* Explaining the architecture, mechanics, and hosting model of GitHub Pages (username.github.io) for an interactive robotics portfolio
 
 ## Open Decisions & Next Steps
 
