@@ -1,5 +1,5 @@
 # offGIT - One-Click Setup and Launch
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
 Write-Host "===================================================" -ForegroundColor Cyan
 Write-Host "         offGIT - One-Click Setup & Launch         " -ForegroundColor Cyan
@@ -10,7 +10,11 @@ Write-Host ""
 function Ensure-Package($cmd, $id, $label) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
         Write-Host "[1/5] Installing $label via winget..." -ForegroundColor Yellow
-        winget install --id $id -e --silent --accept-package-agreements --accept-source-agreements
+        try {
+            winget install --id $id -e --silent --accept-package-agreements --accept-source-agreements
+        } catch {
+            Write-Warning "winget install failed for $label. Continuing to check PATH..."
+        }
     } else {
         Write-Host "[1/5] $label is installed." -ForegroundColor Green
     }
@@ -27,8 +31,19 @@ Write-Host "`n[2/5] Configuring Python environment and dependencies..." -Foregro
 $py = Get-Command python -ErrorAction SilentlyContinue
 if (-not $py) {
     Write-Host "Installing Python 3.12..." -ForegroundColor Yellow
-    winget install --id Python.Python.3.12 -e --silent --accept-package-agreements --accept-source-agreements
+    try {
+        winget install --id Python.Python.3.12 -e --silent --accept-package-agreements --accept-source-agreements
+    } catch {
+        Write-Warning "winget install failed for Python."
+    }
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+}
+
+$py = Get-Command python -ErrorAction SilentlyContinue
+if (-not $py) {
+    Write-Host "`n[ERROR] Python is required but could not be found on PATH." -ForegroundColor Red
+    Write-Host "Please install Python 3.10+ from https://python.org or Microsoft Store, then re-run this script." -ForegroundColor Yellow
+    exit 1
 }
 
 $offgitHome = "$env:USERPROFILE\.offgit"
@@ -47,22 +62,46 @@ if ($isLocal) {
     $rawBase = "https://raw.githubusercontent.com/MaheswarPraveen/offgit/main"
     $files = @("sync_engine.py", "prompt_counter.py", "watcher.py", "debounce_trigger.py", "config.yaml", "FIXES.md", "README.md")
     foreach ($f in $files) {
-        Invoke-WebRequest -Uri "$rawBase/$f" -OutFile "$offgitHome\$f" -UseBasicParsing
+        try {
+            Invoke-WebRequest -Uri "$rawBase/$f" -OutFile "$offgitHome\$f" -UseBasicParsing -ErrorAction Stop
+        } catch {
+            Write-Host "`n[ERROR] Failed to download $f from GitHub: $_" -ForegroundColor Red
+            Write-Host "Please verify your internet connection and re-run this script." -ForegroundColor Yellow
+            exit 1
+        }
     }
 }
 
 # Install Python runtime libraries
-python -m pip install pyyaml watchdog --quiet
+Write-Host "Installing Python runtime libraries (pyyaml, watchdog)..." -ForegroundColor Yellow
+$pipProcess = Start-Process -FilePath "python" -ArgumentList "-m", "pip", "install", "pyyaml", "watchdog", "--quiet" -Wait -PassThru -NoNewWindow
+if ($pipProcess.ExitCode -ne 0) {
+    Write-Warning "pip install returned exit code $($pipProcess.ExitCode). Checking if dependencies are already satisfied..."
+    $checkDeps = python -c "import yaml, watchdog; print('OK')" 2>&1
+    if ($checkDeps -notmatch "OK") {
+        Write-Host "`n[ERROR] Failed to install required Python libraries (pyyaml, watchdog)." -ForegroundColor Red
+        exit 1
+    }
+}
 
 # 4. GitHub Authentication Gate (Interactive Web Flow)
 Write-Host "`n[3/5] Verifying GitHub authentication..." -ForegroundColor Yellow
-$authStatus = gh auth status 2>&1
+$authCheck = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[offGIT AUTH REQUIRED] Opening your browser to authorize GitHub CLI..." -ForegroundColor Magenta
     Write-Host "Please complete the login in the browser window that opens." -ForegroundColor Cyan
     gh auth login --web --git-protocol https -h github.com
+    
+    # Re-verify authentication after interactive flow
+    $reCheck = gh auth status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "GitHub CLI login was not completed. You can authenticate at any time by running: gh auth login"
+    } else {
+        Write-Host "GitHub CLI is authenticated and ready." -ForegroundColor Green
+    }
+} else {
+    Write-Host "GitHub CLI is authenticated and ready." -ForegroundColor Green
 }
-Write-Host "GitHub CLI is authenticated and ready." -ForegroundColor Green
 
 # 5. Global IDE Integration Rules
 Write-Host "`n[4/5] Installing global IDE integration rules..." -ForegroundColor Yellow
@@ -116,7 +155,8 @@ if (-not (Test-Path $startupFolder)) {
 }
 $startupVbs = Join-Path $startupFolder "offGIT.vbs"
 
-$pythonExe = (Get-Command python).Source
+$pyCmd = Get-Command python -ErrorAction SilentlyContinue
+$pythonExe = $pyCmd.Source
 $pythonDir = Split-Path $pythonExe
 $pythonw = Join-Path $pythonDir "pythonw.exe"
 if (-not (Test-Path $pythonw)) { $pythonw = $pythonExe }
@@ -132,7 +172,12 @@ intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py""", Null, N
 
 # Kill previous instance and start clean detached daemon
 Get-Process -Name pythonw -ErrorAction SilentlyContinue | Stop-Process -Force
-Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"""} | Out-Null
+$launchResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"""}
+
+if ($launchResult.ReturnValue -ne 0) {
+    Write-Warning "WMI process launch returned code $($launchResult.ReturnValue). Starting daemon via fallback..."
+    Start-Process -FilePath $pythonw -ArgumentList """$offgitHome\watcher.py""" -WindowStyle Hidden
+}
 
 Write-Host "`n===================================================" -ForegroundColor Green
 Write-Host " [SUCCESS] offGIT is installed and running!       " -ForegroundColor Green

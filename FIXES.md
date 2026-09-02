@@ -18,7 +18,7 @@ This document contains canonical error signatures, root causes, and verified fix
 
 ## 2. Windows: Background Daemon Terminating After Parent Shell Exits
 
-- **Symptom**: `pythonw.exe` starts but exits within 5â€“10 seconds after the PowerShell terminal or parent script terminates.
+- **Symptom**: `pythonw.exe` starts but exits within 5-10 seconds after the PowerShell terminal or parent script terminates.
 - **Root Cause**: Windows Job Objects automatically kill child processes spawned by a temporary subshell when the parent shell closes.
 - **Canonical Fix**: Spawn the background process via WMI `Win32_Process.Create` (detached from the shell job object):
   ```powershell
@@ -67,7 +67,7 @@ This document contains canonical error signatures, root causes, and verified fix
 
 ## 6. Prompt Counter Latency: High Turn Latency During Chat
 
-- **Symptom**: Chat agent hangs for 3â€“6 seconds before answering simple prompts.
+- **Symptom**: Chat agent hangs for 3-6 seconds before answering simple prompts.
 - **Root Cause**: `prompt_counter.py` importing heavy third-party modules (`yaml`, `watchdog`, `sync_engine`) and calling external LLM CLI subprocesses (`claude -p`) on every turn.
 - **Canonical Fix**: Decouple `prompt_counter.py` into a standalone, zero-dependency script using pure Python standard library (`json`, `pathlib`, `datetime`). Drops total execution time to **< 190ms**.
 
