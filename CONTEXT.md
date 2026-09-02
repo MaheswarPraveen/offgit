@@ -1,16 +1,15 @@
 # Live Project Context: offgit
 
-**Last Synced:** 2026-09-02 11:38:43
+**Last Synced:** 2026-09-02 11:44:05
 
 ## Current Focus & Active State
 
-- Directive: Implement 4 production hardening fixes: LLM fallback chain, per-repo lockfile, thought filename collision guard, and multi-instance watcher prevention
-- Rationale: Hardening sync_engine.py and watcher.py against concurrent race conditions, silent LLM degradation, filename collisions, and duplicate daemon instances
+- Directive: Launch 7 parallel verification subagents to audit the entire offGIT codebase for zero-margin fresh-install correctness
+- Rationale: Spawning 7 independent subagents each targeting a specific failure domain: syntax/imports, Windows installer, macOS/Linux installer, config/path resolution, documentation, sync engine logic, and watcher daemon
+- Updated `CONTEXT.md` (+3/-16 lines).
 
 ## Recent Context Stream
 
-- **[antigravity]** (2026-08-31 11:04:06): Eliminate hardcoded paths and user references: implement dynamic home-directory resolution (~), automatic gh username detection, and harness directory discovery
-  *Rationale:* Refactoring config.yaml, sync_engine.py, and watcher.py to dynamically expand user home directories and detect GitHub user credentials without leaking hardcoded folder names
 - **[antigravity]** (2026-08-31 11:28:11): Add native support for OpenCode AI terminal assistant: source attribution, OPENCODE.md context pointer, and rule deployment
   *Rationale:* Integrating OpenCode into offGIT: adding OpenCode source attribution, OPENCODE.md rule generation, hook configuration, and documentation
 - **[antigravity]** (2026-09-02 05:05:46): Fix gh auth timeout milestone suppression and eliminate synthetic checkpoint spam in thoughts
@@ -19,6 +18,8 @@
   *Rationale:* Locking down strict quality gates in FIXES.md and sync_engine to guarantee thoughts repository remains clean, curated, and free of synthetic checkpoints or conversational chatter
 - **[antigravity]** (2026-09-02 05:44:21): Implement 4 production hardening fixes: LLM fallback chain, per-repo lockfile, thought filename collision guard, and multi-instance watcher prevention
   *Rationale:* Hardening sync_engine.py and watcher.py against concurrent race conditions, silent LLM degradation, filename collisions, and duplicate daemon instances
+- **[antigravity]** (2026-09-02 06:10:57): Launch 7 parallel verification subagents to audit the entire offGIT codebase for zero-margin fresh-install correctness
+  *Rationale:* Spawning 7 independent subagents each targeting a specific failure domain: syntax/imports, Windows installer, macOS/Linux installer, config/path resolution, documentation, sync engine logic, and watch
 
 ## Open Decisions & Next Steps
 

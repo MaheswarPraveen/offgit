@@ -238,3 +238,9 @@ Automated continuity log maintained by offGIT.
 
 - Directive: Implement 4 production hardening fixes: LLM fallback chain, per-repo lockfile, thought filename collision guard, and multi-instance watcher prevention
 - Rationale: Hardening sync_engine.py and watcher.py against concurrent race conditions, silent LLM degradation, filename collisions, and duplicate daemon instances
+
+## 2026-09-02 11:44:05 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Launch 7 parallel verification subagents to audit the entire offGIT codebase for zero-margin fresh-install correctness
+- Rationale: Spawning 7 independent subagents each targeting a specific failure domain: syntax/imports, Windows installer, macOS/Linux installer, config/path resolution, documentation, sync engine logic, and watcher daemon
+- Updated `CONTEXT.md` (+3/-16 lines).
