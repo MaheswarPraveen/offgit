@@ -176,3 +176,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Add native support for OpenCode AI terminal assistant: source attribution, OPENCODE.md context pointer, and rule deployment
 - Rationale: Integrating OpenCode into offGIT: adding OpenCode source attribution, OPENCODE.md rule generation, hook configuration, and documentation
 - Applied workspace modifications (+0/-0 lines).
+
+## 2026-09-02 10:40:42 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Enforce permanent anti-spam and high-signal quality standard for private thoughts repository
+- Rationale: Locking down strict quality gates in FIXES.md and sync_engine to guarantee thoughts repository remains clean, curated, and free of synthetic checkpoints or conversational chatter
+- Updated `CONTEXT.md` (+3/-17 lines).
