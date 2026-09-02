@@ -113,11 +113,59 @@ def devlog_10min_batch_loop(handler: IdleEventHandler):
         except Exception as loop_err:
             logger.error(f"Error in batch loop iteration: {loop_err}\n{traceback.format_exc()}")
 
+WATCHER_PID_FILE = Path.home() / ".offgit" / "watcher.pid"
+
+def _is_process_alive(pid: int) -> bool:
+    """Check if a process with the given PID is still running."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except (OSError, ProcessLookupError, PermissionError):
+        return False
+
+def _acquire_watcher_lock() -> bool:
+    """Ensures only one watcher instance runs. Returns True if lock acquired, False if another instance is alive."""
+    if WATCHER_PID_FILE.exists():
+        try:
+            existing_pid = int(WATCHER_PID_FILE.read_text(encoding="utf-8").strip())
+            if _is_process_alive(existing_pid) and existing_pid != os.getpid():
+                return False
+            # Stale PID file from a dead process, safe to overwrite
+            logger.info(f"Cleaning up stale watcher PID file (PID {existing_pid} is no longer running)")
+        except (ValueError, Exception):
+            pass
+    WATCHER_PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    return True
+
+def _release_watcher_lock() -> None:
+    try:
+        if WATCHER_PID_FILE.exists():
+            stored_pid = int(WATCHER_PID_FILE.read_text(encoding="utf-8").strip())
+            if stored_pid == os.getpid():
+                WATCHER_PID_FILE.unlink()
+    except Exception:
+        pass
+
 def main():
     try:
+        if not _acquire_watcher_lock():
+            existing_pid = WATCHER_PID_FILE.read_text(encoding="utf-8").strip()
+            logger.warning(f"offGIT watcher already running (PID: {existing_pid}). Exiting duplicate instance.")
+            return
+
         ready, msg = check_github_prerequisites()
         if not ready:
             logger.error(f"Cannot start offGIT Watcher: {msg}")
+            _release_watcher_lock()
             return
 
         logger.info("Starting offGIT filesystem watcher & 10-minute batch engine...")
@@ -128,6 +176,7 @@ def main():
 
         if not dirs:
             logger.warning("No valid watched_directories found in config.yaml.")
+            _release_watcher_lock()
             return
 
         handler = IdleEventHandler(exts)
@@ -145,6 +194,8 @@ def main():
             time.sleep(1)
     except Exception as e:
         logger.error(f"FATAL crash in watcher: {e}\n{traceback.format_exc()}")
+    finally:
+        _release_watcher_lock()
 
 if __name__ == "__main__":
     main()

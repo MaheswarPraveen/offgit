@@ -240,33 +240,38 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
         return "- Routine maintenance / empty diff."
 
     cli_cmd = CONFIG.get("llm_tool", "claude")
-    prompt = (
-        "Generate a factual, concise 3-5 bullet point changelog entry based on this git diff and prompt context.\n"
-        "Strict rules: No emojis. Plain factual statements only. Highlight changed files, functions, and architecture decisions.\n\n"
-        f"PROMPT CONTEXT:\n{json.dumps(prompt_context, indent=2)}\n\n"
-        f"GIT DIFF:\n{diff}\n"
-    )
 
-    # Safe list execution (shell=False) with strict 15s timeout
+    # LLM path: only attempt if the binary actually exists on PATH
     if cli_cmd and shutil.which(cli_cmd) and cli_cmd in ["claude", "cursor-agent", "codex", "openai"]:
+        prompt = (
+            "Generate a factual, concise 3-5 bullet point changelog entry based on this git diff and prompt context.\n"
+            "Strict rules: No emojis. Plain factual statements only. Highlight changed files, functions, and architecture decisions.\n\n"
+            f"PROMPT CONTEXT:\n{json.dumps(prompt_context, indent=2)}\n\n"
+            f"GIT DIFF:\n{diff}\n"
+        )
         code, out, err = run_cmd([cli_cmd, "-p", prompt[:4000]], timeout=15)
         if code == 0 and out.strip():
             return strip_emojis(out.strip())
         else:
-            logger.debug(f"LLM headless summarizer failed (code {code}): {err}")
+            logger.debug(f"LLM headless summarizer unavailable (code {code}): {err}. Falling back to heuristic.")
 
-    # Fallback diff heuristic
+    # Deterministic heuristic fallback (zero external dependencies)
     bullets = []
-    lines = diff.split("\n")
+    lines = diff.split("\n") if diff else []
     modified_files = set()
     added_lines = 0
     deleted_lines = 0
+    first_hunks = []
 
     for line in lines:
         if line.startswith("+++ b/"):
             modified_files.add(line[6:])
         elif line.startswith("+") and not line.startswith("+++"):
             added_lines += 1
+            stripped = line[1:].strip()
+            # Capture function/class/struct signatures from added lines
+            if len(first_hunks) < 3 and stripped and any(kw in stripped for kw in ["def ", "class ", "fn ", "func ", "function ", "void ", "int ", "struct ", "impl "]):
+                first_hunks.append(stripped[:80])
         elif line.startswith("-") and not line.startswith("---"):
             deleted_lines += 1
 
@@ -281,9 +286,13 @@ def summarize_with_llm(diff: str, prompt_context: list[dict], tool: str) -> str:
 
     if modified_files:
         files_str = ", ".join(f"`{f}`" for f in sorted(modified_files)[:5])
-        bullets.append(f"- Updated {files_str} (+{added_lines}/-{deleted_lines} lines).")
+        overflow = f" and {len(modified_files) - 5} more" if len(modified_files) > 5 else ""
+        bullets.append(f"- Updated {files_str}{overflow} (+{added_lines}/-{deleted_lines} lines).")
     elif lines:
         bullets.append(f"- Applied workspace modifications (+{added_lines}/-{deleted_lines} lines).")
+
+    if first_hunks:
+        bullets.append("- Key changes: " + "; ".join(first_hunks))
 
     return "\n".join(bullets)
 
@@ -671,6 +680,13 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         filename = f"{date_str}_{proj_slug}_{topic_slug}.md"
         file_path = thoughts_repo / filename
 
+        # Collision guard: if a file with the same slug already exists, append a short content hash
+        if file_path.exists():
+            import hashlib
+            content_hash = hashlib.sha1(primary_summary.encode("utf-8")).hexdigest()[:6]
+            filename = f"{date_str}_{proj_slug}_{topic_slug}_{content_hash}.md"
+            file_path = thoughts_repo / filename
+
         # Construct or append to clean architecture document
         title_text = primary_summary[:80] + ("..." if len(primary_summary) > 80 else "")
         content = f"# Architecture Decision: {title_text}\n\n"
@@ -772,6 +788,40 @@ def notify(title: str, message: str) -> None:
     except Exception as e:
         logger.debug(f"Notification error: {e}")
 
+def _acquire_repo_lock(repo_path: str) -> int | None:
+    """Acquires an exclusive per-repo lockfile. Returns fd on success, None if already locked."""
+    lock_file = os.path.join(repo_path, ".offgit", "sync.lock")
+    os.makedirs(os.path.dirname(lock_file), exist_ok=True)
+    try:
+        # Stale lock cleanup: if lockfile is older than 5 minutes, it is from a dead process
+        if os.path.exists(lock_file):
+            age = time.time() - os.path.getmtime(lock_file)
+            if age > 300:
+                logger.warning(f"Removing stale lockfile in {repo_path} (age: {age:.0f}s)")
+                os.unlink(lock_file)
+            else:
+                return None
+        fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        return fd
+    except FileExistsError:
+        return None
+    except Exception as e:
+        logger.debug(f"Lock acquisition failed for {repo_path}: {e}")
+        return None
+
+def _release_repo_lock(repo_path: str, fd: int) -> None:
+    """Releases the per-repo lockfile."""
+    lock_file = os.path.join(repo_path, ".offgit", "sync.lock")
+    try:
+        os.close(fd)
+    except Exception:
+        pass
+    try:
+        os.unlink(lock_file)
+    except Exception:
+        pass
+
 def run_sync(repo_path: str, trigger_source: str) -> None:
     ready, msg = check_github_prerequisites()
     if not ready:
@@ -783,21 +833,30 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
         logger.warning(f"Invalid repo_path passed to run_sync: {repo_path}")
         return
 
-    logger.info(f"Running offGIT sync on {repo_path} (trigger: {trigger_source})")
-
-    diff = get_diff(repo_path)
-    prompt_context = read_prompt_log(repo_path)
-
-    if not diff and not prompt_context:
-        logger.info(f"No diff and no prompt context in {repo_path}, skipping sync.")
+    # Per-repo exclusive lock: prevents concurrent syncs from watcher + IDE trigger + prompt_counter
+    fd = _acquire_repo_lock(repo_path)
+    if fd is None:
+        logger.info(f"Skipping sync for {repo_path}: another sync is already in progress.")
         return
 
-    summary = summarize_with_llm(diff, prompt_context, trigger_source)
+    try:
+        logger.info(f"Running offGIT sync on {repo_path} (trigger: {trigger_source})")
 
-    write_devlog(repo_path, summary, trigger_source)
-    update_context_md(repo_path, summary)
-    commit_and_push(repo_path)
-    classify_thought(diff, prompt_context, trigger_source, repo_path)
+        diff = get_diff(repo_path)
+        prompt_context = read_prompt_log(repo_path)
+
+        if not diff and not prompt_context:
+            logger.info(f"No diff and no prompt context in {repo_path}, skipping sync.")
+            return
+
+        summary = summarize_with_llm(diff, prompt_context, trigger_source)
+
+        write_devlog(repo_path, summary, trigger_source)
+        update_context_md(repo_path, summary)
+        commit_and_push(repo_path)
+        classify_thought(diff, prompt_context, trigger_source, repo_path)
+    finally:
+        _release_repo_lock(repo_path, fd)
 
 
 def query_antigravity_transcripts(query: str = "", limit: int = 10) -> list[dict]:
