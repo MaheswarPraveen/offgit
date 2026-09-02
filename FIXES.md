@@ -18,7 +18,7 @@ This document contains canonical error signatures, root causes, and verified fix
 
 ## 2. Windows: Background Daemon Terminating After Parent Shell Exits
 
-- **Symptom**: `pythonw.exe` starts but exits within 5–10 seconds after the PowerShell terminal or parent script terminates.
+- **Symptom**: `pythonw.exe` starts but exits within 5â€“10 seconds after the PowerShell terminal or parent script terminates.
 - **Root Cause**: Windows Job Objects automatically kill child processes spawned by a temporary subshell when the parent shell closes.
 - **Canonical Fix**: Spawn the background process via WMI `Win32_Process.Create` (detached from the shell job object):
   ```powershell
@@ -67,7 +67,7 @@ This document contains canonical error signatures, root causes, and verified fix
 
 ## 6. Prompt Counter Latency: High Turn Latency During Chat
 
-- **Symptom**: Chat agent hangs for 3–6 seconds before answering simple prompts.
+- **Symptom**: Chat agent hangs for 3â€“6 seconds before answering simple prompts.
 - **Root Cause**: `prompt_counter.py` importing heavy third-party modules (`yaml`, `watchdog`, `sync_engine`) and calling external LLM CLI subprocesses (`claude -p`) on every turn.
 - **Canonical Fix**: Decouple `prompt_counter.py` into a standalone, zero-dependency script using pure Python standard library (`json`, `pathlib`, `datetime`). Drops total execution time to **< 190ms**.
 
@@ -78,3 +78,17 @@ This document contains canonical error signatures, root causes, and verified fix
 - **Symptom**: Subprocess crashes on code diffs containing quotes, `$`, backticks, or semicolons.
 - **Root Cause**: Using `shell=True` with string interpolation `f'{cli_cmd} -p "{prompt}"'`.
 - **Canonical Fix**: Pass arguments as an explicit list `[cli_cmd, "-p", prompt]` with `shell=False`.
+
+---
+
+## 8. Thoughts Repository: Synthetic Checkpoint Spam & Duplicate Thrash
+
+- **Symptom**: `thoughts` repository gets flooded with dozens of duplicate markdown files (e.g. `..._1016_...md`, `..._1022_...md`) containing trivial conversational comments (*"what what about my first hi"*, *"are these going to thoughts"*).
+- **Root Cause**:
+  1. `classify_thought()` was fabricating synthetic entries from static `CONTEXT.md` directives when `valid_entries` was empty, writing a new file every 10 minutes for every watched folder.
+  2. Filenames included minute timestamps (`%H%M`), creating new duplicate files on every batch cycle.
+  3. Acceptance threshold was too loose (`len >= 8`), ingesting casual chat into architecture decision files.
+- **Canonical Fix**:
+  1. **Strict Return on Empty**: If there are no new un-synced prompts with genuine technical substance, `classify_thought` returns immediately and writes zero files.
+  2. **Substantive Architecture Filter (`is_genuine_architectural_thought`)**: Requires `ai_thinking >= 30` characters or explicit technical domain keywords (`implement`, `refactor`, `architecture`, `kinematics`, `firmware`, `algorithm`, `protocol`). Drops all meta-questions and conversational chit-chat.
+  3. **Clean Filenames Without Minute Timestamps**: Uses `YYYY-MM-DD_<project>_<topic>.md` to prevent duplicate files across batch cycles.
