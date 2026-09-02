@@ -799,6 +799,109 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
     commit_and_push(repo_path)
     classify_thought(diff, prompt_context, trigger_source, repo_path)
 
+
+def query_antigravity_transcripts(query: str = "", limit: int = 10) -> list[dict]:
+    """Scans Antigravity brain JSONL transcripts for cross-chat examination and historical context discovery."""
+    brain_dir = Path.home() / ".gemini" / "antigravity" / "brain"
+    if not brain_dir.exists():
+        return []
+
+    results = []
+    query_lower = query.lower().strip() if query else ""
+
+    # Sort conversation folders by modification time (most recent first)
+    conv_dirs = sorted(
+        [d for d in brain_dir.iterdir() if d.is_dir() and not d.name.startswith(".")],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True
+    )
+
+    for c_dir in conv_dirs:
+        t_file = c_dir / ".system_generated" / "logs" / "transcript.jsonl"
+        if not t_file.exists():
+            continue
+
+        try:
+            first_prompt = ""
+            created_at = ""
+            matched_steps = []
+
+            with open(t_file, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        step = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    step_type = step.get("type", "")
+                    content = step.get("content", "")
+                    thinking = step.get("thinking", "")
+
+                    if step_type == "USER_INPUT" and not first_prompt:
+                        raw = content.split("</USER_REQUEST>")[0].replace("<USER_REQUEST>", "").strip()
+                        first_prompt = " ".join(raw.split())[:120]
+                        created_at = step.get("created_at", "")[:16].replace("T", " ")
+
+                    # Check query match
+                    if query_lower:
+                        haystack = f"{content} {thinking}".lower()
+                        if query_lower in haystack:
+                            matched_steps.append({
+                                "step_index": step.get("step_index"),
+                                "type": step_type,
+                                "snippet": content[:140] if content else thinking[:140]
+                            })
+
+            if query_lower:
+                if matched_steps:
+                    results.append({
+                        "id": c_dir.name,
+                        "created_at": created_at,
+                        "title": first_prompt or "Untitled Conversation",
+                        "matches": len(matched_steps),
+                        "sample": matched_steps[0]["snippet"]
+                    })
+            else:
+                if first_prompt:
+                    results.append({
+                        "id": c_dir.name,
+                        "created_at": created_at,
+                        "title": first_prompt,
+                        "matches": 0,
+                        "sample": ""
+                    })
+
+            if len(results) >= limit:
+                break
+
+        except Exception as e:
+            logger.debug(f"Error reading transcript for {c_dir.name}: {e}")
+
+    return results
+
+def print_cross_chat_results(query: str = "") -> None:
+    print("===================================================")
+    print("      offGIT Cross-Chat Conversation Discovery      ")
+    print("===================================================")
+    if query:
+        print(f"Searching across all Antigravity chat sessions for: '{query}'...\n")
+    else:
+        print("Listing recent Antigravity chat sessions...\n")
+
+    chats = query_antigravity_transcripts(query, limit=12)
+    if not chats:
+        print("No matching conversation transcripts found.")
+        return
+
+    for c in chats:
+        print(f"* [{c['created_at']}] (ID: {c['id'][:8]}...)")
+        print(f"  Topic: {c['title']}")
+        if c['sample']:
+            print(f"  Match Snippet: {c['sample']}")
+        print()
+
 def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
     """Performs automated self-healing diagnostics and prints known error patterns from FIXES.md."""
     print("===================================================")
@@ -836,6 +939,8 @@ def main():
     parser.add_argument("--log-prompt", action="store_true", help="Append an entry to prompt-log.jsonl")
     parser.add_argument("--scaffold", action="store_true", help="Scaffold and create GitHub repository")
     parser.add_argument("--fix", action="store_true", help="Run self-healing diagnostics and display FIXES.md error reference")
+    parser.add_argument("--cross-chat", type=str, default="", help="Search and examine across all Antigravity conversation transcripts")
+    parser.add_argument("--list-chats", action="store_true", help="List recent Antigravity conversation sessions")
     parser.add_argument("--diagnose", action="store_true", help="Alias for --fix")
     parser.add_argument("--name", type=str, default="", help="Repository name for scaffolding")
     parser.add_argument("--visibility", type=str, default="", help="Repository visibility: private or public")
@@ -844,6 +949,10 @@ def main():
     parser.add_argument("--thinking", type=str, default="", help="AI thinking / architecture explanation")
 
     args = parser.parse_args()
+
+    if args.list_chats or args.cross_chat:
+        print_cross_chat_results(args.cross_chat)
+        return
 
     if args.fix or args.diagnose:
         run_self_healing_diagnostics(args.repo)
