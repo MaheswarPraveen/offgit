@@ -212,3 +212,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Enforce permanent anti-spam and high-signal quality standard for private thoughts repository
 - Rationale: Locking down strict quality gates in FIXES.md and sync_engine to guarantee thoughts repository remains clean, curated, and free of synthetic checkpoints or conversational chatter
 - Applied workspace modifications (+0/-0 lines).
+
+## 2026-09-02 11:15:33 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Implement 4 production hardening fixes: LLM fallback chain, per-repo lockfile, thought filename collision guard, and multi-instance watcher prevention
+- Rationale: Hardening sync_engine.py and watcher.py against concurrent race conditions, silent LLM degradation, filename collisions, and duplicate daemon instances
+- Updated `CONTEXT.md` (+3/-17 lines).
