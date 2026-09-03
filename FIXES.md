@@ -92,3 +92,19 @@ This document contains canonical error signatures, root causes, and verified fix
   1. **Strict Return on Empty**: If there are no new un-synced prompts with genuine technical substance, `classify_thought` returns immediately and writes zero files.
   2. **Substantive Architecture Filter (`is_genuine_architectural_thought`)**: Requires `ai_thinking >= 30` characters or explicit technical domain keywords (`implement`, `refactor`, `architecture`, `kinematics`, `firmware`, `algorithm`, `protocol`). Drops all meta-questions and conversational chit-chat.
   3. **Clean Filenames Without Minute Timestamps**: Uses `YYYY-MM-DD_<project>_<topic>.md` to prevent duplicate files across batch cycles.
+
+---
+
+## 9. Contribution Graph Blackouts: Uninitialized Projects & Placeholder Noreply Emails
+
+- **Symptom**: Developer works for hours across dozens of turns, but the GitHub contribution graph shows zero activity or black squares.
+- **Root Cause**:
+  1. **Uninitialized Directory**: The project folder in `scratch/` was created without running `git init`. `commit_and_push()` skipped non-git folders silently (`if not .git.exists(): return`).
+  2. **Unlinked Placeholder Email**: Global Git config was set to `Username@users.noreply.github.com` instead of the user's primary verified GitHub email. GitHub refuses to credit commits to the contribution graph unless the author email is verified on the account.
+  3. **No Remote Configured**: A local git repo existed but had no remote `origin`, leaving commits stranded on the local drive.
+- **Canonical Fix**:
+  1. **Global Email Enforcement**: Set global git config to verified email:
+     `git config --global user.email "maheswarpraveen@gmail.com"`
+  2. **Dynamic Email Resolver (`get_verified_git_email`)**: Replaces any unverified noreply strings dynamically with verified primary email on every commit.
+  3. **Auto-Init Git**: If a watched project folder lacks `.git`, `commit_and_push()` runs `git init -b main` automatically.
+  4. **Auto-Scaffold Remote**: If no remote is configured and `gh` is authenticated, offGIT automatically creates the GitHub repository (`gh repo create <target> --source . --remote origin --push`) and establishes continuous sync.
