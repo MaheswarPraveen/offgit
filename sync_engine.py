@@ -116,6 +116,18 @@ def get_authenticated_github_user() -> str:
         return out.strip()
     return ""
 
+def get_verified_git_email() -> str:
+    """Dynamically resolves a verified email address to guarantee GitHub contribution attribution."""
+    code, email, _ = run_cmd(["git", "config", "--global", "user.email"], timeout=5)
+    if code == 0 and email and "@" in email and not email.strip().endswith("@users.noreply.github.com"):
+        return email.strip()
+
+    code, gh_email, _ = run_cmd(["gh", "api", "user", "-q", ".email"], timeout=5)
+    if code == 0 and gh_email and "@" in gh_email and gh_email.strip() != "null":
+        return gh_email.strip()
+
+    return "maheswarpraveen@gmail.com"
+
 def check_github_prerequisites() -> tuple[bool, str]:
     """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
     if shutil.which("gh") is None:
@@ -430,8 +442,20 @@ def update_context_md(repo_path: str, summary: str) -> None:
 
 def commit_and_push(repo_path: str) -> None:
     """Stages, commits, pulls with rebase to prevent remote divergences, and pushes safely."""
-    if not (Path(repo_path) / ".git").exists():
-        return
+    git_dir = Path(repo_path) / ".git"
+    verified_email = get_verified_git_email()
+
+    # AUTO-INITIALIZE GIT: Never leave an active project directory unversioned
+    if not git_dir.exists():
+        logger.info(f"Auto-initializing Git repository in {repo_path} to guarantee continuous tracking.")
+        run_cmd(["git", "init", "-b", "main"], cwd=repo_path, timeout=10)
+        run_cmd(["git", "config", "user.name", "Maheswar N Praveen"], cwd=repo_path, timeout=5)
+        run_cmd(["git", "config", "user.email", verified_email], cwd=repo_path, timeout=5)
+    else:
+        # Guarantee local repository is using the verified contribution email
+        code_e, cur_e, _ = run_cmd(["git", "config", "user.email"], cwd=repo_path, timeout=5)
+        if code_e != 0 or not cur_e or cur_e.strip().endswith("@users.noreply.github.com"):
+            run_cmd(["git", "config", "user.email", verified_email], cwd=repo_path, timeout=5)
 
     ensure_gitignore(repo_path)
     run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
@@ -451,6 +475,22 @@ def commit_and_push(repo_path: str) -> None:
     # Check remote destination
     code_remote, remote_url, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path, timeout=5)
     if code_remote != 0 or not remote_url:
+        # AUTO-SCAFFOLD TO GITHUB: Connect remote repository automatically so work is never stuck locally
+        logger.info(f"No remote configured for {repo_path}. Checking GitHub CLI authentication for auto-connect...")
+        gh_ready, _ = check_github_prerequisites()
+        if gh_ready:
+            folder_name = Path(repo_path).name
+            vis = "public" if folder_name.endswith(".github.io") else CONFIG.get("default_repo_visibility", "private")
+            gh_user = get_authenticated_github_user()
+            target_repo = f"{gh_user}/{folder_name}" if gh_user else folder_name
+            scaffold_code, _, sc_err = run_cmd(["gh", "repo", "create", target_repo, f"--{vis}", "--source", ".", "--remote", "origin", "--push"], cwd=repo_path, timeout=30)
+            if scaffold_code == 0:
+                logger.info(f"Successfully auto-created and connected remote GitHub repository for {repo_path} ({vis})")
+                notify(f"offGIT Auto-Scaffolded: {folder_name}", f"Repository created ({vis}) and published to GitHub.")
+                return
+            else:
+                logger.debug(f"Auto-scaffold note: {sc_err}")
+
         logger.info(f"Local commit created. No remote configured for {repo_path}.")
         return
 
