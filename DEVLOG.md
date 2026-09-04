@@ -489,3 +489,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Explain how GitHub Pages portfolio websites work before taking action
 - Rationale: Explaining the architecture, mechanics, and hosting model of GitHub Pages (username.github.io) for an interactive robotics portfolio
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-04 09:46:14 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: Find past working days with unrecorded GitHub contributions and restore contribution activity
+- Rationale: Scanning filesystem modification dates, Antigravity brain transcripts, and local git commit histories to detect legitimate working days that had no GitHub contributions, and backfilling verified commits
+- Updated `CONTEXT.md` (+3/-17 lines).
