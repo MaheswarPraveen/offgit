@@ -15,16 +15,29 @@ echo ""
 OS_TYPE="$(uname -s)"
 echo "[1/6] Detecting operating system: $OS_TYPE"
 
+run_as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif sudo -n true 2>/dev/null; then
+        sudo "$@"
+    elif [ -t 0 ]; then
+        sudo "$@"
+    else
+        echo "[Notice] Root permissions required for '$*'. Skipping unattended execution."
+        return 1
+    fi
+}
+
 install_package() {
     PKG=$1
     if command -v brew >/dev/null 2>&1; then
         brew install "$PKG" || true
     elif command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update -qq && sudo apt-get install -y -qq "$PKG" || true
+        run_as_root apt-get update -qq && run_as_root apt-get install -y -qq "$PKG" || true
     elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y -q "$PKG" || true
+        run_as_root dnf install -y -q "$PKG" || true
     elif command -v pacman >/dev/null 2>&1; then
-        sudo pacman -Sy --noconfirm "$PKG" || true
+        run_as_root pacman -Sy --noconfirm "$PKG" || true
     fi
 }
 
@@ -40,11 +53,11 @@ if ! command -v gh >/dev/null 2>&1; then
     if [ "$OS_TYPE" = "Darwin" ]; then
         install_package gh
     elif command -v apt-get >/dev/null 2>&1; then
-        type -p curl >/dev/null || sudo apt install curl -y
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-        sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-        sudo apt update && sudo apt install gh -y
+        type -p curl >/dev/null || run_as_root apt-get install curl -y
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | run_as_root dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+        run_as_root chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | run_as_root tee /etc/apt/sources.list.d/github-cli.list > /dev/null || true
+        run_as_root apt-get update -qq && run_as_root apt-get install gh -y -qq || true
     else
         install_package github-cli
     fi
@@ -53,6 +66,12 @@ fi
 if ! command -v python3 >/dev/null 2>&1; then
     echo "Installing python3..."
     install_package python3
+fi
+
+if command -v apt-get >/dev/null 2>&1; then
+    install_package python3-pip
+    install_package python3-yaml
+    install_package python3-watchdog
 fi
 
 # 3. GitHub Authentication Check
@@ -185,7 +204,14 @@ EOF
     echo "Registered macOS LaunchAgent: com.offgit.watcher"
 
 else
+    USE_SYSTEMD=false
     if command -v systemctl >/dev/null 2>&1; then
+        if systemctl --user is-system-running >/dev/null 2>&1 || systemctl --user status >/dev/null 2>&1; then
+            USE_SYSTEMD=true
+        fi
+    fi
+
+    if [ "$USE_SYSTEMD" = true ]; then
         SERVICE_DIR="$HOME/.config/systemd/user"
         mkdir -p "$SERVICE_DIR"
         SERVICE_PATH="$SERVICE_DIR/offgit.service"
@@ -206,12 +232,18 @@ StandardError=append:$HOME/.offgit/logs/engine.log
 [Install]
 WantedBy=default.target
 EOF
-        systemctl --user daemon-reload
-        systemctl --user enable --now offgit.service
+        systemctl --user daemon-reload || true
+        systemctl --user enable --now offgit.service || true
         echo "Registered Linux systemd user service: offgit.service"
     else
         nohup python3 "$HOME/.offgit/watcher.py" >> "$HOME/.offgit/logs/engine.log" 2>&1 &
         echo "Started background daemon via nohup."
+        AUTOSTART_CMD='pgrep -f "watcher.py" >/dev/null 2>&1 || nohup python3 "$HOME/.offgit/watcher.py" >> "$HOME/.offgit/logs/engine.log" 2>&1 &'
+        if [ -f "$HOME/.bashrc" ] && ! grep -q "watcher.py" "$HOME/.bashrc"; then
+            echo "$AUTOSTART_CMD" >> "$HOME/.bashrc"
+        elif [ -f "$HOME/.profile" ] && ! grep -q "watcher.py" "$HOME/.profile"; then
+            echo "$AUTOSTART_CMD" >> "$HOME/.profile"
+        fi
     fi
 fi
 

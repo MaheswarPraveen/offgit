@@ -39,13 +39,22 @@ class IdleEventHandler(FileSystemEventHandler):
                 self.active_repos.add(repo_dir)
                 logger.debug(f"File modification in {event.src_path} (repo: {repo_dir})")
 
-    def find_repo_root(self, file_path: str) -> str:
-        cur = Path(file_path).resolve().parent
-        while cur != cur.parent:
-            if (cur / ".git").exists() or (cur / ".offgit").exists():
-                return str(cur)
-            cur = cur.parent
-        return str(Path(file_path).parent)
+    def find_repo_root(self, file_path: str) -> str | None:
+        try:
+            cur = Path(file_path).resolve().parent
+            home = Path.home().resolve()
+            watched_bases = [Path(d).resolve() for d in get_watched_directories()]
+
+            while cur != cur.parent and cur != home:
+                if (cur / ".git").exists() or (cur / ".offgit").exists():
+                    return str(cur)
+                for base in watched_bases:
+                    if cur.parent == base and cur != base:
+                        return str(cur)
+                cur = cur.parent
+        except Exception:
+            pass
+        return None
 
 def get_watched_directories() -> list[str]:
     """Dynamically resolves and expands user home directory paths (~) across Windows, macOS, and Linux."""

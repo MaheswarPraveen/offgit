@@ -440,8 +440,28 @@ def update_context_md(repo_path: str, summary: str) -> None:
     logger.info(f"Overwrote live CONTEXT.md in {context_path}")
     ensure_tool_pointers(repo_path)
 
+def is_protected_directory(path: Path | str) -> bool:
+    """Returns True if the directory is a system root, user home, or generic placeholder like Default Project."""
+    try:
+        resolved = Path(path).resolve()
+        home = Path.home().resolve()
+        if resolved == home or resolved == resolved.parent:
+            return True
+        system_names = {"documents", "desktop", "downloads", "pictures", "videos", "music", "projects", "workspace", "dev", "default project", "default-project", "temp", "tmp"}
+        if resolved.name.lower() in system_names and resolved.parent == home:
+            return True
+        if resolved.name.lower() in {"default project", "default-project"}:
+            return True
+    except Exception:
+        pass
+    return False
+
 def commit_and_push(repo_path: str) -> None:
     """Stages, commits, pulls with rebase to prevent remote divergences, and pushes safely."""
+    if is_protected_directory(repo_path):
+        logger.warning(f"Skipping commit_and_push for protected or placeholder directory: {repo_path}")
+        return
+
     git_dir = Path(repo_path) / ".git"
     verified_email = get_verified_git_email()
 
@@ -449,7 +469,9 @@ def commit_and_push(repo_path: str) -> None:
     if not git_dir.exists():
         logger.info(f"Auto-initializing Git repository in {repo_path} to guarantee continuous tracking.")
         run_cmd(["git", "init", "-b", "main"], cwd=repo_path, timeout=10)
-        run_cmd(["git", "config", "user.name", "Maheswar N Praveen"], cwd=repo_path, timeout=5)
+        gh_user = get_authenticated_github_user()
+        author_name = gh_user if gh_user else "Maheswar N Praveen"
+        run_cmd(["git", "config", "user.name", author_name], cwd=repo_path, timeout=5)
         run_cmd(["git", "config", "user.email", verified_email], cwd=repo_path, timeout=5)
     else:
         # Guarantee local repository is using the verified contribution email
@@ -480,6 +502,9 @@ def commit_and_push(repo_path: str) -> None:
         gh_ready, _ = check_github_prerequisites()
         if gh_ready:
             folder_name = Path(repo_path).name
+            if is_protected_directory(repo_path) or folder_name.lower() in {"default project", "default-project"}:
+                logger.info(f"Local commit created. Skipping auto-scaffold for generic/placeholder directory: {repo_path}")
+                return
             vis = "public" if folder_name.endswith(".github.io") else CONFIG.get("default_repo_visibility", "private")
             gh_user = get_authenticated_github_user()
             target_repo = f"{gh_user}/{folder_name}" if gh_user else folder_name
@@ -1049,15 +1074,61 @@ def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
         print(f"[FAIL] {msg}")
 
     # 2. Check background daemon status
-    res_ps = run_cmd(["powershell", "-NoProfile", "-Command", "Get-Process -Name pythonw -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"])
-    if res_ps[0] == 0 and res_ps[1].strip():
-        print(f"[OK] Background watcher daemon is running (PID: {res_ps[1].strip()}).")
+    is_daemon_running = False
+    daemon_pid = None
+    pid_file = Path.home() / ".offgit" / "watcher.pid"
+    if pid_file.exists():
+        try:
+            stored_pid = int(pid_file.read_text(encoding="utf-8").strip())
+            if os.name == "nt":
+                import ctypes
+                k32 = ctypes.windll.kernel32
+                handle = k32.OpenProcess(0x1000, False, stored_pid)
+                if handle:
+                    k32.CloseHandle(handle)
+                    is_daemon_running = True
+                    daemon_pid = stored_pid
+            else:
+                os.kill(stored_pid, 0)
+                is_daemon_running = True
+                daemon_pid = stored_pid
+        except Exception:
+            pass
+
+    if not is_daemon_running:
+        if os.name == "nt":
+            res_ps = run_cmd(["powershell", "-NoProfile", "-Command", "Get-Process -Name pythonw -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"])
+            if res_ps[0] == 0 and res_ps[1].strip():
+                is_daemon_running = True
+                daemon_pid = res_ps[1].strip().split()[0]
+        else:
+            res_pgrep = run_cmd(["pgrep", "-f", "watcher.py"])
+            if res_pgrep[0] == 0 and res_pgrep[1].strip():
+                is_daemon_running = True
+                daemon_pid = res_pgrep[1].strip().split()[0]
+            elif shutil.which("systemctl"):
+                res_sys = run_cmd(["systemctl", "--user", "is-active", "--quiet", "offgit.service"])
+                if res_sys[0] == 0:
+                    is_daemon_running = True
+
+    if is_daemon_running:
+        pid_str = f" (PID: {daemon_pid})" if daemon_pid else ""
+        print(f"[OK] Background watcher daemon is running{pid_str}.")
     else:
         print("[WARNING] Background watcher daemon is not running. Attempting auto-restart...")
-        vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
-        if vbs_path.exists():
-            run_cmd(["wscript.exe", str(vbs_path)])
-            print("[OK] Restarted background watcher daemon.")
+        if os.name == "nt":
+            vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
+            if vbs_path.exists():
+                run_cmd(["wscript.exe", str(vbs_path)])
+                print("[OK] Restarted background watcher daemon via VBS.")
+        else:
+            if shutil.which("systemctl"):
+                run_cmd(["systemctl", "--user", "restart", "offgit.service"])
+            nohup_log = Path.home() / ".offgit" / "logs" / "engine.log"
+            watcher_script = Path.home() / ".offgit" / "watcher.py"
+            if watcher_script.exists():
+                subprocess.Popen([sys.executable, str(watcher_script)], stdout=open(str(nohup_log), "a", encoding="utf-8"), stderr=subprocess.STDOUT, start_new_session=True)
+                print("[OK] Restarted background watcher daemon.")
 
     # 3. Print FIXES.md summary
     fixes_file = Path.home() / ".offgit" / "FIXES.md"

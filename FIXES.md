@@ -108,3 +108,29 @@ This document contains canonical error signatures, root causes, and verified fix
   2. **Dynamic Email Resolver (`get_verified_git_email`)**: Replaces any unverified noreply strings dynamically with verified primary email on every commit.
   3. **Auto-Init Git**: If a watched project folder lacks `.git`, `commit_and_push()` runs `git init -b main` automatically.
   4. **Auto-Scaffold Remote**: If no remote is configured and `gh` is authenticated, offGIT automatically creates the GitHub repository (`gh repo create <target> --source . --remote origin --push`) and establishes continuous sync.
+
+---
+
+## 10. Linux & WSL: "Daemon Not Running" False Warning & Sudo Installer Hangs
+
+- **Symptom**: `sync_engine.py --fix` outputs `[WARNING] Background watcher daemon is not running` on Linux/Ubuntu/WSL even when `watcher.py` is actively running. On fresh installs, `install.sh` hangs or crashes on `sudo apt` or `ModuleNotFoundError: No module named 'watchdog'`.
+- **Root Cause**:
+  1. `sync_engine.py` hardcoded a Windows-only `powershell Get-Process -Name pythonw` check, failing on all POSIX environments.
+  2. Ubuntu/Debian does not bundle `pip` with `python3` (`No module named pip`), and PEP 668 prevents bare pip installs without `--break-system-packages`.
+  3. `install.sh` ran `sudo apt` without non-interactive guards, hanging on password prompts in piped `curl | bash` executions.
+- **Canonical Fix**:
+  1. **Cross-Platform Process Health**: In `sync_engine.py`, query `~/.offgit/watcher.pid` and verify liveness with `os.kill(pid, 0)` on POSIX / `kernel32.OpenProcess` on Windows. Fall back to `pgrep -f watcher.py` and `systemctl --user is-active offgit.service`.
+  2. **Native APT Package Installation**: Install `python3-yaml`, `python3-watchdog`, and `python3-pip` directly via APT.
+  3. **Graceful Daemon Autostart Fallback**: Test if `systemctl --user` is functional; if in WSL/containers without user systemd, fall back to `nohup` and persist invocation in `~/.bashrc`.
+
+---
+
+## 11. Rogue Git Initialization & Auto-Scaffolding on Generic Placeholder Folders
+
+- **Symptom**: Unintended GitHub repositories (e.g. `Default-Project`) created automatically, or `.git` initialized in user home (`~`) or root `Documents`, breaking nested repository git operations.
+- **Root Cause**:
+  1. `find_repo_root()` in `watcher.py` fell back to `Path(file_path).parent` when no `.git` existed, passing arbitrary parent folders into `run_sync()`.
+  2. `commit_and_push()` in `sync_engine.py` auto-initialized git on any folder and called `gh repo create` to push to remote. When OpenCode opened in its default empty directory (`Documents/Default Project`), offGIT versioned and pushed it as a new GitHub repository.
+- **Canonical Fix**:
+  1. **Protected Path Boundary (`is_protected_directory`)**: Strictly forbid `git init` and auto-scaffolding in home (`~`), filesystem root, common OS directories (`Documents`, `Desktop`, `Downloads`, `Projects`), and generic placeholders (`Default Project`, `Default-Project`, `tmp`).
+  2. **Strict Repo Root Discovery**: `find_repo_root()` returns `None` if no `.git` or `.offgit` exists and the path is not a recognized direct child of a watched project directory.
