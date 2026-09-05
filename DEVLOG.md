@@ -525,3 +525,9 @@ Automated continuity log maintained by offGIT.
 - Directive: no i mean i dont think aider works as the way i said it
 - Rationale: Clarify how Aider architect mode actually functions versus the user's specific architectural vision of hierarchical task division, decomposition, and multi-harness delegation.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-05 11:25:51 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: create an interface where 1) IT WILL GIVE OPTIONS FOR CHOOSING ARCHITECT AND EDITORS BASED ON AVAILABLE RESOURCES. 2 ITS TAKES INPUT ARCHITECT DECIDES HOW MANY SUBAGENTS ARE OR IS REQUIRED AND ALSO ASKS HUMAN, 3 ARCHITECH DOES HEAVY IFT WHILE SENS PSEUDOCODE TO SMALL EDITORS. ALL POP UP PROMPT ASKING FOR SUGGESTIONS SHOULD BE DIRECTED IN OUR CLI . BEFORE EXECUTING GIVE OVERVIEW OPF THIS IDEA AND SAY WHAT CAN YOU DO
+- Rationale: Architect an interactive CLI harness that dynamically detects available local and cloud models/harnesses, enables human-confirmed task decomposition, and executes parallel subagents via pseudocode dispatch.
+- Updated `CONTEXT.md` (+3/-17 lines).
