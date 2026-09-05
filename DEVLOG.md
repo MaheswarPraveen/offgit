@@ -495,3 +495,9 @@ Automated continuity log maintained by offGIT.
 - Directive: Find past working days with unrecorded GitHub contributions and restore contribution activity
 - Rationale: Scanning filesystem modification dates, Antigravity brain transcripts, and local git commit histories to detect legitimate working days that had no GitHub contributions, and backfilling verified commits
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-05 10:00:03 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: it wasnt installing propely in ubuntu btw, it was showing daemon not running and also created git somehwere else such that it coukdnt access anything and wasnt working at all. why dont you try it out it wsl and find out
+- Rationale: Debugging offgit installation in Ubuntu/WSL: diagnosing why daemon was reported not running, investigating git path resolution and directory creation issues
+- Updated `CONTEXT.md` (+3/-17 lines).
