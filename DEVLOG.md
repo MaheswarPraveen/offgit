@@ -519,3 +519,9 @@ Automated continuity log maintained by offGIT.
 - Directive: is there anyway i can use both opencode and gemini toghether where tasks gets divided where architecture gets exeecuted bynhigh end model and small free models gets small task divided
 - Rationale: Analyze hybrid orchestration architectures combining high-end reasoning models with lightweight execution models across OpenCode and Antigravity, including file-based context handoffs, subagent architectures, and offGIT ambient sync.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-05 11:04:41 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: no i mean i dont think aider works as the way i said it
+- Rationale: Clarify how Aider architect mode actually functions versus the user's specific architectural vision of hierarchical task division, decomposition, and multi-harness delegation.
+- Updated `CONTEXT.md` (+3/-17 lines).
