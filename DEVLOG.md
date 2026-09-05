@@ -507,3 +507,9 @@ Automated continuity log maintained by offGIT.
 - Directive: this is the issues that happened in my friends ubuntu while installing
 - Rationale: Correlating user friend's Ubuntu diagnostic logs with the fixes committed to offgit main repo
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-05 10:26:24 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: can you clean up offgit in wsl and try again if successful , delete again
+- Rationale: Clean up offgit installation in WSL, run clean test install to verify end-to-end reliability, and clean it up afterwards as directed.
+- Updated `CONTEXT.md` (+3/-17 lines).
