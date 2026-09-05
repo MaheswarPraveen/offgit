@@ -501,3 +501,9 @@ Automated continuity log maintained by offGIT.
 - Directive: it wasnt installing propely in ubuntu btw, it was showing daemon not running and also created git somehwere else such that it coukdnt access anything and wasnt working at all. why dont you try it out it wsl and find out
 - Rationale: Debugging offgit installation in Ubuntu/WSL: diagnosing why daemon was reported not running, investigating git path resolution and directory creation issues
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-05 10:20:56 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: this is the issues that happened in my friends ubuntu while installing
+- Rationale: Correlating user friend's Ubuntu diagnostic logs with the fixes committed to offgit main repo
+- Updated `CONTEXT.md` (+3/-17 lines).
