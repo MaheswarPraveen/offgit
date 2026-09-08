@@ -531,3 +531,9 @@ Automated continuity log maintained by offGIT.
 - Directive: create an interface where 1) IT WILL GIVE OPTIONS FOR CHOOSING ARCHITECT AND EDITORS BASED ON AVAILABLE RESOURCES. 2 ITS TAKES INPUT ARCHITECT DECIDES HOW MANY SUBAGENTS ARE OR IS REQUIRED AND ALSO ASKS HUMAN, 3 ARCHITECH DOES HEAVY IFT WHILE SENS PSEUDOCODE TO SMALL EDITORS. ALL POP UP PROMPT ASKING FOR SUGGESTIONS SHOULD BE DIRECTED IN OUR CLI . BEFORE EXECUTING GIVE OVERVIEW OPF THIS IDEA AND SAY WHAT CAN YOU DO
 - Rationale: Architect an interactive CLI harness that dynamically detects available local and cloud models/harnesses, enables human-confirmed task decomposition, and executes parallel subagents via pseudocode dispatch.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-09 02:05:14 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: why the hell is offgit not running or uploadin g, say the reason first . then well fix
+- Rationale: Diagnose why offgit is not running or uploading by checking watcher process, logs, git status, and GitHub CLI auth.
+- Updated `CONTEXT.md` (+3/-17 lines).
