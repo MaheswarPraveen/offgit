@@ -537,3 +537,9 @@ Automated continuity log maintained by offGIT.
 - Directive: why the hell is offgit not running or uploadin g, say the reason first . then well fix
 - Rationale: Diagnose why offgit is not running or uploading by checking watcher process, logs, git status, and GitHub CLI auth.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-09 02:16:26 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: do windows restart fix also make it work in github
+- Rationale: Fix Windows startup persistence via Scheduled Task, delete broken offgit-demo dummy folder, verify GitHub sync end-to-end, and push fixes upstream.
+- Updated `CONTEXT.md` (+3/-17 lines).
