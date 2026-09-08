@@ -522,6 +522,9 @@ def commit_and_push(repo_path: str) -> None:
     # Pull with rebase first to prevent push rejection if upstream moved
     pull_code, _, pull_err = run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=repo_path, timeout=20)
     if pull_code != 0:
+        if "repository not found" in pull_err.lower() or "not found" in pull_err.lower():
+            logger.error(f"Remote repository does not exist on GitHub for {repo_path}: {pull_err.strip()}")
+            return
         logger.warning(f"git pull --rebase encountered a conflict in {repo_path}: {pull_err}")
         run_cmd(["git", "rebase", "--abort"], cwd=repo_path, timeout=10)
         logger.info(f"Aborted rebase in {repo_path} to restore clean local state. Skipping push for this cycle.")
@@ -1117,10 +1120,28 @@ def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
     else:
         print("[WARNING] Background watcher daemon is not running. Attempting auto-restart...")
         if os.name == "nt":
-            vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
-            if vbs_path.exists():
-                run_cmd(["wscript.exe", str(vbs_path)])
-                print("[OK] Restarted background watcher daemon via VBS.")
+            watcher_script = Path.home() / ".offgit" / "watcher.py"
+            python_dir = Path(sys.executable).parent
+            pythonw = python_dir / "pythonw.exe"
+            py_bin = str(pythonw) if pythonw.exists() else sys.executable
+            # Ensure registry run key is present
+            reg_cmd = [
+                "reg", "add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                "/v", "offGIT", "/t", "REG_SZ",
+                "/d", f'"{py_bin}" "{watcher_script}"',
+                "/f"
+            ]
+            run_cmd(reg_cmd)
+            # Launch detached pythonw
+            no_window = subprocess.CREATE_NO_WINDOW
+            try:
+                subprocess.Popen([py_bin, str(watcher_script)], creationflags=no_window, close_fds=True)
+                print("[OK] Restarted background watcher daemon.")
+            except Exception:
+                vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
+                if vbs_path.exists():
+                    run_cmd(["wscript.exe", str(vbs_path)])
+                    print("[OK] Restarted background watcher daemon via VBS fallback.")
         else:
             if shutil.which("systemctl"):
                 run_cmd(["systemctl", "--user", "restart", "offgit.service"])

@@ -170,6 +170,11 @@ intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py""", Null, N
 [System.IO.File]::WriteAllText($startupVbs, $vbsContent, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$offgitHome\start_offgit.vbs", $vbsContent, [System.Text.UTF8Encoding]::new($false))
 
+# Register HKCU Run key for guaranteed autostart on Windows logon (survives reboot without VBScript restrictions)
+$runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+Set-ItemProperty -Path $runKeyPath -Name "offGIT" -Value "`"$pythonw`" `"$offgitHome\watcher.py`"" -Force
+Write-Host "Registered Windows autostart (Registry Run & Startup folder)." -ForegroundColor Green
+
 # Kill previous instance and start clean detached daemon
 Get-Process -Name pythonw -ErrorAction SilentlyContinue | Stop-Process -Force
 $launchResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"""}

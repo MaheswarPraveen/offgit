@@ -134,3 +134,13 @@ This document contains canonical error signatures, root causes, and verified fix
 - **Canonical Fix**:
   1. **Protected Path Boundary (`is_protected_directory`)**: Strictly forbid `git init` and auto-scaffolding in home (`~`), filesystem root, common OS directories (`Documents`, `Desktop`, `Downloads`, `Projects`), and generic placeholders (`Default Project`, `Default-Project`, `tmp`).
   2. **Strict Repo Root Discovery**: `find_repo_root()` returns `None` if no `.git` or `.offgit` exists and the path is not a recognized direct child of a watched project directory.
+
+---
+
+## 12. Windows: Watcher Daemon Terminated Across Reboots / Fast Startup
+
+- **Symptom**: `sync_engine.py --fix` outputs `[WARNING] Background watcher daemon is not running` after restarting or waking Windows. Automatic 10-minute sync commits stop uploading.
+- **Root Cause**: Windows 11 disables or delays execution of standalone `.vbs` files in the user Startup folder due to VBScript deprecation, or Fast Startup fails to execute legacy Startup folder items.
+- **Canonical Fix**:
+  1. **Registry Run Key Persistence**: Register `pythonw.exe ~/.offgit/watcher.py` directly under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\offGIT` during installation and self-healing `--fix`. Runs automatically on every Windows logon without requiring administrative elevation or VBScript.
+  2. **Direct Detached Spawn**: In `--fix`, launch `pythonw.exe` using `subprocess.CREATE_NO_WINDOW` instead of relying solely on `wscript.exe`.
