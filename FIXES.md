@@ -144,3 +144,17 @@ This document contains canonical error signatures, root causes, and verified fix
 - **Canonical Fix**:
   1. **Registry Run Key Persistence**: Register `pythonw.exe ~/.offgit/watcher.py` directly under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\offGIT` during installation and self-healing `--fix`. Runs automatically on every Windows logon without requiring administrative elevation or VBScript.
   2. **Direct Detached Spawn**: In `--fix`, launch `pythonw.exe` using `subprocess.CREATE_NO_WINDOW` instead of relying solely on `wscript.exe`.
+
+---
+
+## 13. Repository Clutter & Secret Leakage: Tool Pointer Spam and .env Staging
+
+- **Symptom**: User projects get spammed with 8+ metadata markdown files (`CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `.cursorrules`, `.cursor/`, `ARCHITECTURE.md`), and sensitive `.env` files containing API keys get committed and pushed to GitHub.
+- **Root Cause**:
+  1. `ensure_tool_pointers()` auto-generated dummy pointer files for every known AI editor in every repository root on every sync cycle.
+  2. `ensure_gitignore()` only ignored `.offgit/` and `logs/`, failing to ignore `.env*` before `git add -A` was executed.
+  3. `scaffold_repo_direct()` generated boilerplate `ARCHITECTURE.md` with placeholder text.
+- **Canonical Fix**:
+  1. **Disable Tool Pointer Spam**: Deactivate `ensure_tool_pointers()` from injecting dummy markdown/rule files into project roots.
+  2. **Strict Secret Protection in .gitignore**: `ensure_gitignore()` automatically ensures `.env`, `.env.*`, `*.env`, `__pycache__/`, and `*.pyc` are in `.gitignore`.
+  3. **Active .env Git Gate**: `commit_and_push()` explicitly executes `git rm --cached -f .env*` and `git reset HEAD .env*` before and after staging to guarantee local secrets never touch the remote repository.

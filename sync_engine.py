@@ -141,42 +141,31 @@ def check_github_prerequisites() -> tuple[bool, str]:
 
 def ensure_gitignore(repo_path: str) -> None:
     gitignore_path = Path(repo_path) / ".gitignore"
-    entry = "\n.offgit/\nlogs/\n*.log\n"
+    required_entries = [
+        ".offgit/",
+        "logs/",
+        "*.log",
+        ".env",
+        ".env.*",
+        "*.env",
+        "__pycache__/",
+        "*.pyc"
+    ]
     try:
+        current_lines = []
         if gitignore_path.exists():
-            content = gitignore_path.read_text(encoding="utf-8")
-            if ".offgit" not in content:
-                gitignore_path.write_text(content.rstrip() + entry, encoding="utf-8")
-        else:
-            gitignore_path.write_text(".offgit/\nlogs/\n*.log\n", encoding="utf-8")
+            current_lines = [line.strip() for line in gitignore_path.read_text(encoding="utf-8").splitlines()]
+
+        missing = [entry for entry in required_entries if entry not in current_lines]
+        if missing or not gitignore_path.exists():
+            new_content = "\n".join(current_lines + missing).strip() + "\n"
+            gitignore_path.write_text(new_content, encoding="utf-8")
     except Exception as e:
         logger.warning(f"Could not update .gitignore in {repo_path}: {e}")
 
 def ensure_tool_pointers(repo_path: str) -> None:
-    """Non-destructively ensures AI editors have a pointer to CONTEXT.md without stomping on existing content."""
-    pointer_line = "See CONTEXT.md for current project state."
-    r_path = Path(repo_path)
-
-    for doc_name in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", ".cursorrules"]:
-        f_path = r_path / doc_name
-        try:
-            if f_path.exists():
-                c = f_path.read_text(encoding="utf-8")
-                if pointer_line not in c:
-                    f_path.write_text(f"{c.rstrip()}\n\n# Project Context\n{pointer_line}\n", encoding="utf-8")
-            else:
-                f_path.write_text(f"{pointer_line}\n", encoding="utf-8")
-        except Exception as e:
-            logger.debug(f"Could not write {doc_name} in {repo_path}: {e}")
-
-    cursor_rules_dir = r_path / ".cursor" / "rules"
-    cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    cursor_mdc = cursor_rules_dir / "context.mdc"
-    try:
-        if not cursor_mdc.exists():
-            cursor_mdc.write_text(f"---\ndescription: Live Project Context\nglobs: *\n---\n{pointer_line}\n", encoding="utf-8")
-    except Exception as e:
-        logger.debug(f"Could not write Cursor context.mdc in {repo_path}: {e}")
+    """Disabled: Do not pollute project repositories with editor-specific tool pointers."""
+    return
 
 def get_diff(repo_path: str) -> str:
     if not (Path(repo_path) / ".git").exists():
@@ -480,7 +469,10 @@ def commit_and_push(repo_path: str) -> None:
             run_cmd(["git", "config", "user.email", verified_email], cwd=repo_path, timeout=5)
 
     ensure_gitignore(repo_path)
+    # SECURITY GATE: Strictly untrack and exclude .env files before committing
+    run_cmd(["git", "rm", "--cached", "-f", ".env", ".env.local", ".env.production"], cwd=repo_path, timeout=5)
     run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
+    run_cmd(["git", "reset", "HEAD", ".env", ".env.*"], cwd=repo_path, timeout=5)
 
     code, staged_diff, _ = run_cmd(["git", "diff", "--cached", "--quiet"], cwd=repo_path, timeout=5)
     if code == 0:
@@ -605,30 +597,6 @@ Created with and maintained with:
 - **Antigravity**
 """
         readme.write_text(readme_content, encoding="utf-8")
-
-    arch = p_path / "ARCHITECTURE.md"
-    if not arch.exists():
-        arch_content = f"""# System Architecture: {clean_name}
-
-## 1. Architectural Overview
-
-This document outlines the core system design, component boundaries, and implementation patterns for **{clean_name}**.
-
----
-
-## 2. Key Components
-
-- **Core Module**: Primary application logic and state management.
-- **Interfaces & Adapters**: Ingestion, input handling, and external protocol bridges.
-- **Configuration & Storage**: Persistent parameters, configuration schemas, and data structures.
-
----
-
-## 3. Decision Log
-
-Historical architectural decisions and technical trade-offs are documented continuously in [`DEVLOG.md`](./DEVLOG.md).
-"""
-        arch.write_text(arch_content, encoding="utf-8")
 
     context_file = p_path / "CONTEXT.md"
     if not context_file.exists():
