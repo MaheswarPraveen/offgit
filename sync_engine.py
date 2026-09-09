@@ -427,7 +427,6 @@ def update_context_md(repo_path: str, summary: str) -> None:
 
     context_path.write_text("\n".join(md_lines), encoding="utf-8")
     logger.info(f"Overwrote live CONTEXT.md in {context_path}")
-    ensure_tool_pointers(repo_path)
 
 def is_protected_directory(path: Path | str) -> bool:
     """Returns True if the directory is a system root, user home, or generic placeholder like Default Project."""
@@ -471,6 +470,25 @@ def commit_and_push(repo_path: str) -> None:
     ensure_gitignore(repo_path)
     # SECURITY GATE: Strictly untrack and exclude .env files before committing
     run_cmd(["git", "rm", "--cached", "-f", ".env", ".env.local", ".env.production"], cwd=repo_path, timeout=5)
+
+    # CLUTTER PURGE GATE: Continuously purge legacy editor pointer clutter (.cursor, CLAUDE.md, etc.)
+    for junk in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", ".cursorrules", "ARCHITECTURE.md"]:
+        junk_path = Path(repo_path) / junk
+        if junk_path.exists():
+            try:
+                junk_path.unlink()
+                run_cmd(["git", "rm", "--cached", "-f", junk], cwd=repo_path, timeout=5)
+            except Exception:
+                pass
+    cursor_dir = Path(repo_path) / ".cursor"
+    if cursor_dir.exists():
+        try:
+            import shutil
+            shutil.rmtree(cursor_dir, ignore_errors=True)
+            run_cmd(["git", "rm", "-rf", "--cached", ".cursor"], cwd=repo_path, timeout=5)
+        except Exception:
+            pass
+
     run_cmd(["git", "add", "-A"], cwd=repo_path, timeout=10)
     run_cmd(["git", "reset", "HEAD", ".env", ".env.*"], cwd=repo_path, timeout=5)
 
