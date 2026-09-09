@@ -549,3 +549,9 @@ Automated continuity log maintained by offGIT.
 - Directive: why is there this much of files now the repo is even confusing
 - Rationale: Explain why offGIT scaffolds multiple context and tool pointer files, check if .env was accidentally committed with sensitive keys, and offer to consolidate or clean up the clutter.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-09 11:03:34 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: it should be cleaned up and never happen in future
+- Rationale: Execute immediate security and clutter cleanup on llm-bot-harness-setup, delete duplicate matha-electronics repo, and permanently patch offGIT sync engine to prevent tool pointer spam and .env leakage.
+- Updated `CONTEXT.md` (+3/-17 lines).
