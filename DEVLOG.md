@@ -543,3 +543,9 @@ Automated continuity log maintained by offGIT.
 - Directive: do windows restart fix also make it work in github
 - Rationale: Fix Windows startup persistence via Scheduled Task, delete broken offgit-demo dummy folder, verify GitHub sync end-to-end, and push fixes upstream.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-09 10:52:49 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: why is there this much of files now the repo is even confusing
+- Rationale: Explain why offGIT scaffolds multiple context and tool pointer files, check if .env was accidentally committed with sensitive keys, and offer to consolidate or clean up the clutter.
+- Updated `CONTEXT.md` (+3/-17 lines).
