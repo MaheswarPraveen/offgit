@@ -555,3 +555,9 @@ Automated continuity log maintained by offGIT.
 - Directive: it should be cleaned up and never happen in future
 - Rationale: Execute immediate security and clutter cleanup on llm-bot-harness-setup, delete duplicate matha-electronics repo, and permanently patch offGIT sync engine to prevent tool pointer spam and .env leakage.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-10 10:22:08 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: still not removed or made neat
+- Rationale: Inspect GitHub repository state for matha-electronics and llm-bot-harness-setup to verify what files remain visible on GitHub and remove remaining clutter.
+- Updated `CONTEXT.md` (+3/-17 lines).
