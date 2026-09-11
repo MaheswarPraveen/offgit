@@ -168,7 +168,7 @@ if (-not (Test-Path $pythonw)) { $pythonw = $pythonExe }
 $vbsContent = @"
 Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
 Set objProcess = objWMIService.Get("Win32_Process")
-intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py""", Null, Null, intProcessID)
+intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py"" --force", Null, Null, intProcessID)
 "@
 
 [System.IO.File]::WriteAllText($startupVbs, $vbsContent, [System.Text.UTF8Encoding]::new($false))
@@ -176,16 +176,16 @@ intReturn = objProcess.Create("""$pythonw"" ""$offgitHome\watcher.py""", Null, N
 
 # Register HKCU Run key for guaranteed autostart on Windows logon (survives reboot without VBScript restrictions)
 $runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-Set-ItemProperty -Path $runKeyPath -Name "offGIT" -Value "`"$pythonw`" `"$offgitHome\watcher.py`"" -Force
-Write-Host "Registered Windows autostart (Registry Run & Startup folder)." -ForegroundColor Green
+Set-ItemProperty -Path $runKeyPath -Name "offGIT" -Value "`"$pythonw`" `"$offgitHome\watcher.py`" --force" -Force
+Write-Host "Registered Windows autostart (Registry Run & Startup folder with --force flag)." -ForegroundColor Green
 
 # Kill previous instance and start clean detached daemon
 Get-Process -Name pythonw -ErrorAction SilentlyContinue | Stop-Process -Force
-$launchResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"""}
+$launchResult = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = """$pythonw"" ""$offgitHome\watcher.py"" --force"}
 
 if ($launchResult.ReturnValue -ne 0) {
     Write-Warning "WMI process launch returned code $($launchResult.ReturnValue). Starting daemon via fallback..."
-    Start-Process -FilePath $pythonw -ArgumentList """$offgitHome\watcher.py""" -WindowStyle Hidden
+    Start-Process -FilePath $pythonw -ArgumentList """$offgitHome\watcher.py"" --force" -WindowStyle Hidden
 }
 
 Write-Host "`n===================================================" -ForegroundColor Green

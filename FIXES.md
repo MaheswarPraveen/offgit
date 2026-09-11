@@ -137,13 +137,17 @@ This document contains canonical error signatures, root causes, and verified fix
 
 ---
 
-## 12. Windows: Watcher Daemon Terminated Across Reboots / Fast Startup
+## 12. Windows & Multi-OS: Watcher Daemon Failing After System Reboot (PID Recycling & Stale Locks)
 
-- **Symptom**: `sync_engine.py --fix` outputs `[WARNING] Background watcher daemon is not running` after restarting or waking Windows. Automatic 10-minute sync commits stop uploading.
-- **Root Cause**: Windows 11 disables or delays execution of standalone `.vbs` files in the user Startup folder due to VBScript deprecation, or Fast Startup fails to execute legacy Startup folder items.
+- **Symptom**: After restarting or rebooting the PC, the background watcher daemon does not start. Running `watcher.py` outputs `offGIT watcher already running (PID: xxxx). Exiting duplicate instance` even though offGIT is not actually running.
+- **Root Cause**:
+  1. **Reboot PID Recycling**: On Windows and Unix, Process IDs are recycled after a system reboot. If `watcher.pid` contains a PID from before the reboot (e.g. 18708), that exact PID might be assigned to a random Windows service (`svchost.exe`, `RuntimeBroker.exe`). A naive `OpenProcess(0x1000, False, pid)` or `kill(pid, 0)` returns True because *some* process has that PID, falsely tricking offGIT into thinking an instance is already running.
+  2. **Orphaned Crash Lockfiles**: If the machine reboots abruptly without a graceful shutdown, `watcher.pid` is left on disk.
 - **Canonical Fix**:
-  1. **Registry Run Key Persistence**: Register `pythonw.exe ~/.offgit/watcher.py` directly under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\offGIT` during installation and self-healing `--fix`. Runs automatically on every Windows logon without requiring administrative elevation or VBScript.
-  2. **Direct Detached Spawn**: In `--fix`, launch `pythonw.exe` using `subprocess.CREATE_NO_WINDOW` instead of relying solely on `wscript.exe`.
+  1. **Process Image Validation**: `_is_process_alive()` uses Windows `QueryFullProcessImageNameW` to verify that the process is actually `python.exe` or `pythonw.exe`. If the recycled PID belongs to any other program, it is rejected and cleared as stale.
+  2. **Boot Uptime Check**: `_is_pid_file_from_prior_boot()` uses `GetTickCount64()` (Windows) or `/proc/uptime` (Linux) to calculate system boot time. If `watcher.pid` was created before the current system boot, it is automatically purged without blocking.
+  3. **`--force` Startup Flag**: `watcher.py` supports `--force`. When passed during Windows logon / systemd / LaunchAgent autostart, it terminates any unresponsive previous instance and guarantees a clean startup.
+  4. **Registry & Service Autostart**: Configured in Windows Registry `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\offGIT`, `install.ps1`, `install.sh`, and `sync_engine.py --fix` with `--force`.
 
 ---
 

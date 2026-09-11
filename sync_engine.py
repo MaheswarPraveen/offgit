@@ -1170,15 +1170,15 @@ def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
             reg_cmd = [
                 "reg", "add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
                 "/v", "offGIT", "/t", "REG_SZ",
-                "/d", f'"{py_bin}" "{watcher_script}"',
+                "/d", f'"{py_bin}" "{watcher_script}" --force',
                 "/f"
             ]
             run_cmd(reg_cmd)
             # Launch detached pythonw
             no_window = subprocess.CREATE_NO_WINDOW
             try:
-                subprocess.Popen([py_bin, str(watcher_script)], creationflags=no_window, close_fds=True)
-                print("[OK] Restarted background watcher daemon.")
+                subprocess.Popen([py_bin, str(watcher_script), "--force"], creationflags=no_window, close_fds=True)
+                print("[OK] Restarted background watcher daemon with --force.")
             except Exception:
                 vbs_path = Path.home() / ".offgit" / "start_offgit.vbs"
                 if vbs_path.exists():
@@ -1190,8 +1190,8 @@ def run_self_healing_diagnostics(repo_path: str | None = None) -> None:
             nohup_log = Path.home() / ".offgit" / "logs" / "engine.log"
             watcher_script = Path.home() / ".offgit" / "watcher.py"
             if watcher_script.exists():
-                subprocess.Popen([sys.executable, str(watcher_script)], stdout=open(str(nohup_log), "a", encoding="utf-8"), stderr=subprocess.STDOUT, start_new_session=True)
-                print("[OK] Restarted background watcher daemon.")
+                subprocess.Popen([sys.executable, str(watcher_script), "--force"], stdout=open(str(nohup_log), "a", encoding="utf-8"), stderr=subprocess.STDOUT, start_new_session=True)
+                print("[OK] Restarted background watcher daemon with --force.")
 
     # 3. Print FIXES.md summary
     fixes_file = Path.home() / ".offgit" / "FIXES.md"

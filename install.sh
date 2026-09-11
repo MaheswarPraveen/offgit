@@ -189,6 +189,7 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     <array>
         <string>$(which python3)</string>
         <string>$HOME/.offgit/watcher.py</string>
+        <string>--force</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -225,7 +226,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$(which python3) $HOME/.offgit/watcher.py
+ExecStart=$(which python3) $HOME/.offgit/watcher.py --force
 Restart=always
 RestartSec=5
 StandardOutput=append:$HOME/.offgit/logs/engine.log
@@ -238,9 +239,9 @@ EOF
         systemctl --user enable --now offgit.service || true
         echo "Registered Linux systemd user service: offgit.service"
     else
-        nohup python3 "$HOME/.offgit/watcher.py" >> "$HOME/.offgit/logs/engine.log" 2>&1 &
+        nohup python3 "$HOME/.offgit/watcher.py" --force >> "$HOME/.offgit/logs/engine.log" 2>&1 &
         echo "Started background daemon via nohup."
-        AUTOSTART_CMD='pgrep -f "watcher.py" >/dev/null 2>&1 || nohup python3 "$HOME/.offgit/watcher.py" >> "$HOME/.offgit/logs/engine.log" 2>&1 &'
+        AUTOSTART_CMD='pgrep -f "watcher.py" >/dev/null 2>&1 || nohup python3 "$HOME/.offgit/watcher.py" --force >> "$HOME/.offgit/logs/engine.log" 2>&1 &'
         if [ -f "$HOME/.bashrc" ] && ! grep -q "watcher.py" "$HOME/.bashrc"; then
             echo "$AUTOSTART_CMD" >> "$HOME/.bashrc"
         elif [ -f "$HOME/.profile" ] && ! grep -q "watcher.py" "$HOME/.profile"; then
