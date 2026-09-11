@@ -107,7 +107,7 @@ This document contains canonical error signatures, root causes, and verified fix
      `git config --global user.email "maheswarpraveen@gmail.com"`
   2. **Dynamic Email Resolver (`get_verified_git_email`)**: Replaces any unverified noreply strings dynamically with verified primary email on every commit.
   3. **Auto-Init Git**: If a watched project folder lacks `.git`, `commit_and_push()` runs `git init -b main` automatically.
-  4. **Auto-Scaffold Remote**: If no remote is configured and `gh` is authenticated, offGIT automatically creates the GitHub repository (`gh repo create <target> --source . --remote origin --push`) and establishes continuous sync.
+  4. **Milestone Scaffolding Only**: If no remote is configured, offGIT commits strictly locally. Remote repository creation is never performed silently and requires explicit user confirmation via in-chat milestone prompts or `--scaffold`.
 
 ---
 
@@ -198,3 +198,16 @@ This document contains canonical error signatures, root causes, and verified fix
 - **Canonical Fix**:
   1. **Verbatim Here-Strings**: Use `@' ... '@` in `install.ps1` to prevent premature variable expansion.
   2. **Universal `$HOME` and Tilde (`~`) Paths**: Use `python "$HOME/.offgit/prompt_counter.py"` and `~/.gemini/antigravity/scratch/`. `$HOME` and `~` resolve dynamically at runtime to any user's personal home directory across Windows PowerShell, macOS, and Linux without hardcoding machine usernames.
+
+---
+
+## 17. Rogue Remote Repository Creation (Silent Auto-Scaffolding Without User Consent)
+
+- **Symptom**: Unwanted, empty, or test private repositories (e.g. `test-agent1-clean-root`, `test-agent3-daemon`, `test-offgit-suite`, `Default-Project`, `lenis_and_animation_refinements`) appear on the user's GitHub account without them asking for them.
+- **Root Cause**:
+  1. `commit_and_push()` in `sync_engine.py` previously contained an aggressive auto-scaffold block: whenever a repository lacked a remote `origin`, it invoked `gh repo create` to push to GitHub automatically under the assumption of "preventing work from being stuck locally".
+  2. Subagents and background tasks running test suites or working on scratch folders inadvertently triggered this code path, publishing unwanted private repositories to GitHub.
+- **Canonical Fix**:
+  1. **Purge Silent Scaffolding**: Completely removed `gh repo create` from `commit_and_push()`. Repositories without a remote remain strictly local (`git commit` only).
+  2. **Enforce Milestone Inception Protocol**: Remote repository creation is exclusively gated behind explicit user confirmation (`--scaffold` invoked after user approval at milestones 5, 15, 30, 60).
+  3. **Zero Remote Push Without Configured Remote**: `commit_and_push()` logs local commit creation and safely skips remote push if no remote is configured.

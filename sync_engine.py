@@ -542,26 +542,7 @@ def commit_and_push(repo_path: str) -> None:
     # Check remote destination
     code_remote, remote_url, _ = run_cmd(["git", "remote", "get-url", "origin"], cwd=repo_path, timeout=5)
     if code_remote != 0 or not remote_url:
-        # AUTO-SCAFFOLD TO GITHUB: Connect remote repository automatically so work is never stuck locally
-        logger.info(f"No remote configured for {repo_path}. Checking GitHub CLI authentication for auto-connect...")
-        gh_ready, _ = check_github_prerequisites()
-        if gh_ready:
-            folder_name = Path(repo_path).name
-            if is_protected_directory(repo_path) or folder_name.lower() in {"default project", "default-project"}:
-                logger.info(f"Local commit created. Skipping auto-scaffold for generic/placeholder directory: {repo_path}")
-                return
-            vis = "public" if folder_name.endswith(".github.io") else CONFIG.get("default_repo_visibility", "private")
-            gh_user = get_authenticated_github_user()
-            target_repo = f"{gh_user}/{folder_name}" if gh_user else folder_name
-            scaffold_code, _, sc_err = run_cmd(["gh", "repo", "create", target_repo, f"--{vis}", "--source", ".", "--remote", "origin", "--push"], cwd=repo_path, timeout=30)
-            if scaffold_code == 0:
-                logger.info(f"Successfully auto-created and connected remote GitHub repository for {repo_path} ({vis})")
-                notify(f"offGIT Auto-Scaffolded: {folder_name}", f"Repository created ({vis}) and published to GitHub.")
-                return
-            else:
-                logger.debug(f"Auto-scaffold note: {sc_err}")
-
-        logger.info(f"Local commit created. No remote configured for {repo_path}.")
+        logger.info(f"Local commit created. No remote configured for {repo_path}. Remote creation requires explicit user confirmation via milestone inception (--scaffold).")
         return
 
     # Pull with rebase first to prevent push rejection if upstream moved
