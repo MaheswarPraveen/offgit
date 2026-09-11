@@ -139,6 +139,10 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 [System.IO.File]::WriteAllText("$geminiConfig\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$geminiConfig\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$geminiConfig\rules\offgit.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
+$agyApp = "$env:USERPROFILE\.gemini\antigravity"
+New-Item -ItemType Directory -Path "$agyApp\rules" -Force | Out-Null
+[System.IO.File]::WriteAllText("$agyApp\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$agyApp\rules\offgit.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$scratchDir\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$scratchDir\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 

@@ -114,7 +114,7 @@ echo "[5/6] Injecting global IDE rules (Antigravity, Claude, Cursor, Codex)..."
 
 GEMINI_DIR="$HOME/.gemini/config"
 SCRATCH_DIR="$HOME/.gemini/antigravity/scratch"
-mkdir -p "$GEMINI_DIR/rules" "$SCRATCH_DIR" "$HOME/.claude" "$HOME/.cursor" "$HOME/.config/opencode"
+mkdir -p "$GEMINI_DIR/rules" "$HOME/.gemini/antigravity/rules" "$SCRATCH_DIR" "$HOME/.claude" "$HOME/.cursor" "$HOME/.config/opencode"
 
 RULE_TEXT="# offGIT Global Integration Rule
 
@@ -144,6 +144,8 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 echo "$RULE_TEXT" > "$GEMINI_DIR/GEMINI.md"
 echo "$RULE_TEXT" > "$GEMINI_DIR/AGENTS.md"
 echo "$RULE_TEXT" > "$GEMINI_DIR/rules/offgit.md"
+echo "$RULE_TEXT" > "$HOME/.gemini/antigravity/GEMINI.md"
+echo "$RULE_TEXT" > "$HOME/.gemini/antigravity/rules/offgit.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/GEMINI.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/AGENTS.md"
 echo "$RULE_TEXT" > "$HOME/.config/opencode/OPENCODE.md"
