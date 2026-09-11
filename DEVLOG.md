@@ -561,3 +561,9 @@ Automated continuity log maintained by offGIT.
 - Directive: still not removed or made neat
 - Rationale: Inspect GitHub repository state for matha-electronics and llm-bot-harness-setup to verify what files remain visible on GitHub and remove remaining clutter.
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-11 10:32:23 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: also even now thoughts md is being weird and all messy, how do we fix that
+- Rationale: Diagnose why thoughts repository became cluttered with tool pointers and conversational chatter, harden classify_thought and is_genuine_architectural_thought in sync_engine.py, purge meta-junk and chatter notes from thoughts, and rebuild clean README index
+- Updated `CONTEXT.md` (+3/-17 lines).
