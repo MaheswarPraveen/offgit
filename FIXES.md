@@ -158,3 +158,19 @@ This document contains canonical error signatures, root causes, and verified fix
   1. **Disable Tool Pointer Spam**: Deactivate `ensure_tool_pointers()` from injecting dummy markdown/rule files into project roots.
   2. **Strict Secret Protection in .gitignore**: `ensure_gitignore()` automatically ensures `.env`, `.env.*`, `*.env`, `__pycache__/`, and `*.pyc` are in `.gitignore`.
   3. **Active .env Git Gate**: `commit_and_push()` explicitly executes `git rm --cached -f .env*` and `git reset HEAD .env*` before and after staging to guarantee local secrets never touch the remote repository.
+
+---
+
+## 14. Thoughts Repository: Conversational Noise, Root Tool Pointer Pollution, and Broken Decision Index
+
+- **Symptom**: Private `thoughts` repository (`~/.offgit/thoughts`) becomes cluttered with 140+ junk notes titled with user conversational chatter (*"bruh it doesnt look human"*, *"dude we dont need this"*, *"wtf wtf now you just"*, *"so what do i do"*), dummy tool pointer files (`OPENCODE.md`, `CLAUDE.md`, `DEVLOG.md`, `CONTEXT.md`) committed in root, and `README.md` displaying dummy table rows with date `-`.
+- **Root Cause**:
+  1. **Tool Pointer Spillover**: Earlier harness versions ran `ensure_tool_pointers()` on `thoughts`, creating editor pointer files in root.
+  2. **Glob Pattern Match Bug**: `classify_thought()` globbed `sorted(thoughts_repo.glob("*.md"))`, catching `OPENCODE.md`, `CLAUDE.md`, etc., which lacked date prefixes, resulting in dummy table rows with date `-`.
+  3. **Permissive Architecture Filter**: `is_genuine_architectural_thought()` accepted any prompt if `len(ai_thinking) >= 30`. Because modern AI assistants generate > 100 chars of thinking on nearly every turn, conversational banter, questions, and frustration prompts passed through.
+  4. **Literal Prompt Slugging**: `classify_thought()` took the first 5 words of the raw user prompt (`" ".join(summary.split()[:5])`), naming notes after emotional chat banter.
+- **Canonical Fix**:
+  1. **Word-Boundary Conversational & Profanity Gate**: Enforce regex word boundaries `\b` across chat slang, emotional markers, questions, and meta-prompts; reject immediately regardless of thinking length.
+  2. **Strict Architecture Keyword Enforcement**: Require genuine engineering/architectural keywords (`kinematics`, `firmware`, `architecture`, `controller`, `protocol`, `servo`, `pinout`, `shader`, `webhook`, `state machine`) AND substantive AI reasoning (`len(thinking) >= 120`).
+  3. **Regex Date Pattern Indexer**: Index only files strictly matching `^(\d{4}-\d{2}-\d{2})[-_]([a-zA-Z0-9\-]+)[-_](.+)\.md$`. Root meta files are never matched.
+  4. **Active Root Clutter Purge**: `classify_thought()` proactively unlinks `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `CONTEXT.md`, `DEVLOG.md`, and `.cursorrules` from `thoughts_repo`.
