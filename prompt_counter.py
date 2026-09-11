@@ -16,15 +16,7 @@ def is_gh_authenticated() -> tuple[bool, str]:
     if shutil.which("gh") is None:
         return False, "GitHub CLI ('gh') is not installed."
 
-    # 1. Fast local token check (sub-100ms, reads local config without network lag)
-    try:
-        res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=2, creationflags=NO_WINDOW)
-        if res.returncode == 0 and res.stdout.strip():
-            return True, ""
-    except Exception:
-        pass
-
-    # 2. Check local hosts.yml config directly (< 1ms)
+    # 1. Check local hosts.yml config directly (< 1ms)
     try:
         config_paths = [
             Path(os.environ.get("APPDATA", "")) / "GitHub CLI" / "hosts.yml",
@@ -33,6 +25,14 @@ def is_gh_authenticated() -> tuple[bool, str]:
         for cp in config_paths:
             if cp.exists() and ("oauth_token" in cp.read_text(encoding="utf-8", errors="ignore") or "user:" in cp.read_text(encoding="utf-8", errors="ignore")):
                 return True, ""
+    except Exception:
+        pass
+
+    # 2. Fast local token check (reads local config via gh CLI without network lag)
+    try:
+        res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=2, creationflags=NO_WINDOW)
+        if res.returncode == 0 and res.stdout.strip():
+            return True, ""
     except Exception:
         pass
 

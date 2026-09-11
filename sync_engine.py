@@ -467,16 +467,14 @@ def is_protected_directory(path: Path | str) -> bool:
         pass
     return False
 
-def commit_and_push(repo_path: str) -> None:
-    """Stages, commits, pulls with rebase to prevent remote divergences, and pushes safely."""
+def ensure_git_repo(repo_path: str) -> None:
+    """Ensures that the directory is an initialized Git repository with verified email and gitignore."""
     if is_protected_directory(repo_path):
-        logger.warning(f"Skipping commit_and_push for protected or placeholder directory: {repo_path}")
         return
 
     git_dir = Path(repo_path) / ".git"
     verified_email = get_verified_git_email()
 
-    # AUTO-INITIALIZE GIT: Never leave an active project directory unversioned
     if not git_dir.exists():
         logger.info(f"Auto-initializing Git repository in {repo_path} to guarantee continuous tracking.")
         run_cmd(["git", "init", "-b", "main"], cwd=repo_path, timeout=10)
@@ -491,6 +489,14 @@ def commit_and_push(repo_path: str) -> None:
             run_cmd(["git", "config", "user.email", verified_email], cwd=repo_path, timeout=5)
 
     ensure_gitignore(repo_path)
+
+def commit_and_push(repo_path: str) -> None:
+    """Stages, commits, pulls with rebase to prevent remote divergences, and pushes safely."""
+    if is_protected_directory(repo_path):
+        logger.warning(f"Skipping commit_and_push for protected or placeholder directory: {repo_path}")
+        return
+
+    ensure_git_repo(repo_path)
     # SECURITY GATE: Strictly untrack and exclude .env files before committing
     run_cmd(["git", "rm", "--cached", "-f", ".env", ".env.local", ".env.production"], cwd=repo_path, timeout=5)
 
@@ -993,6 +999,7 @@ def run_sync(repo_path: str, trigger_source: str) -> None:
         return
 
     try:
+        ensure_git_repo(repo_path)
         diff = get_diff(repo_path)
         unsynced_prompts = get_unsynced_prompts(repo_path)
 
