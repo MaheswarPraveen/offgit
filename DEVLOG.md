@@ -567,3 +567,9 @@ Automated continuity log maintained by offGIT.
 - Directive: also even now thoughts md is being weird and all messy, how do we fix that
 - Rationale: Diagnose why thoughts repository became cluttered with tool pointers and conversational chatter, harden classify_thought and is_genuine_architectural_thought in sync_engine.py, purge meta-junk and chatter notes from thoughts, and rebuild clean README index
 - Updated `CONTEXT.md` (+3/-17 lines).
+
+## 2026-09-11 10:42:54 - Manual edit (Arduino IDE / Thonny / Godot)
+
+- Directive: CLAUDE.md, CODEX.md, OPENCODE.md, CONTEXT.md, DEVLOG.md, .cursorrules, .cursor/ these files come in any new repo created. either put all in one folder everytime if itts really needed or is there anyway to get rid of these without breaking system
+- Rationale: Architect clean solution for repository root clutter: analyze which metadata files are actually necessary for offGIT and AI tools, investigate where each is generated, and design a clean .offgit/ folder centralization or complete elimination so repository roots stay clean like normal developer repositories.
+- Updated `CONTEXT.md` (+3/-17 lines).
