@@ -663,37 +663,53 @@ def clean_prompt_summary(text: str) -> str:
     return cleaned
 
 def is_genuine_architectural_thought(summary: str, thinking: str) -> bool:
-    """Filters out casual chit-chat and meta-queries to ensure only real technical decisions reach thoughts."""
-    s = summary.lower().strip()
+    """Filters out casual chit-chat, frustration, and meta-queries to ensure only real technical decisions reach thoughts."""
+    s = summary.strip()
     t = thinking.strip()
 
     # Reject empty or very short messages
-    if len(s) < 12:
+    if len(s) < 15:
         return False
 
-    # Filter out common conversational and meta chatter
-    trash_triggers = [
-        "hi", "hello", "hey", "cool", "yes", "no", "ok", "okay", "yeah", "nope",
-        "why didn", "what about my", "are these", "tell me", "check the",
-        "where are", "do 2nd", "is it uploaded", "we dont need", "no no",
-        "dont download", "thoughts in git", "what we talking", "what now",
-        "whats happening", "can you tell", "look into that", "dude", "thanks"
-    ]
-    if any(k in s for k in trash_triggers):
-        # Only allow through if there is substantial architectural thinking attached
-        if len(t) < 50:
-            return False
+    # Questions are investigations or help requests, not architectural decisions
+    if s.endswith("?"):
+        return False
 
-    # Valid thought if it has substantial technical rationale or technical directive keywords
-    technical_keywords = [
-        "implement", "refactor", "design", "architecture", "kinematics", "firmware",
-        "algorithm", "controller", "protocol", "hardware", "schema", "optimize",
-        "state", "service", "interface", "driver", "model", "pipeline", "security"
-    ]
-    has_tech_kw = any(k in s for k in technical_keywords)
-    has_thinking = len(t) >= 30
+    import re
+    # Blocklist of conversational chatter, frustration phrases, profanity, and meta prompts using word boundaries
+    conversational_regex = re.compile(
+        r"\b(hi|hello|hey|cool|yeah|nope|okay|ok|thanks|"
+        r"wtf|fuck|frick|shit|bro|dude|bruh|damn|crap|"
+        r"dumb|kidding me|ridiculous|destroyed|terrible|sucks|"
+        r"why|how come|how do we|how can|how to|what about|what now|"
+        r"where|is it|are you|are these|can you|can we|could you|tell me|show me|check|"
+        r"so what do i do|delete it|still not|doesnt look|try it out|no reply|"
+        r"no i want|no i mean|okay im|now im|looks very|so now|well i think|"
+        r"before that|wait just|yes but|actually we|just give|just run|ill do|you do it|make it more|"
+        r"thoughts md|offgit|clean up|remove|undo|redo|default project|taking my thoughts)\b",
+        re.IGNORECASE
+    )
+    if conversational_regex.search(s):
+        return False
 
-    return has_tech_kw or has_thinking
+    # Must contain genuine architectural or core engineering terms
+    technical_regex = re.compile(
+        r"\b(implement|refactor|architecture|kinematics|firmware|"
+        r"algorithm|controller|protocol|hardware|schema|optimize|"
+        r"state machine|interface|driver|pipeline|security|"
+        r"servo|pinout|inverse kinematics|dh parameters|can bus|"
+        r"i2c|spi|uart|telemetry|ros2|shader|webgl|"
+        r"kalman|sensor fusion|webhook|fastapi|rest api)\b",
+        re.IGNORECASE
+    )
+    if not technical_regex.search(s):
+        return False
+
+    # Must also have substantive AI architectural reasoning (> 120 chars)
+    if len(t) < 120:
+        return False
+
+    return True
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
     """Ingests ONLY genuine, unique technical decisions into the private thoughts repo with strict anti-spam deduplication."""
@@ -705,6 +721,22 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         if not (thoughts_repo / ".git").exists():
             run_cmd(["git", "init"], cwd=str(thoughts_repo), timeout=5)
             run_cmd(["git", "branch", "-M", "main"], cwd=str(thoughts_repo), timeout=5)
+
+        # Active clutter purge: remove stray root tool pointers if present
+        for junk_name in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", "CONTEXT.md", "DEVLOG.md", ".cursorrules"]:
+            junk_p = thoughts_repo / junk_name
+            if junk_p.exists():
+                try:
+                    junk_p.unlink()
+                except Exception:
+                    pass
+        cursor_dir = thoughts_repo / ".cursor"
+        if cursor_dir.exists() and cursor_dir.is_dir():
+            try:
+                import shutil
+                shutil.rmtree(cursor_dir, ignore_errors=True)
+            except Exception:
+                pass
 
         ts_file = None
         last_sync_ts = ""
@@ -754,11 +786,12 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         if not valid_entries:
             return
 
-        # Derive clean topic slug without minute timestamps (prevents duplicate spam files)
+        # Derive clean topic slug without minute timestamps or stop words
         primary_entry = valid_entries[-1]
         primary_summary = primary_entry["summary"]
-        words = "".join(c if c.isalnum() else " " for c in primary_summary.lower()).split()[:5]
-        topic_slug = "-".join(words) or "architecture-decision"
+        stop_words = {"the", "a", "an", "and", "or", "to", "in", "for", "with", "on", "at", "by", "from", "of", "is", "it"}
+        clean_words = [w for w in "".join(c if c.isalnum() else " " for c in primary_summary.lower()).split() if w not in stop_words]
+        topic_slug = "-".join(clean_words[:5]) or "architecture-decision"
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         time_str = datetime.now().strftime("%H:%M")
@@ -805,19 +838,30 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         readme_path = thoughts_repo / "README.md"
         all_mds = sorted(thoughts_repo.glob("*.md"), reverse=True)
         table_rows = []
+        import re
+        date_pattern = re.compile(r"^(\d{4}-\d{2}-\d{2})[-_]([a-zA-Z0-9\-]+)[-_](.+)\.md$")
 
         for md in all_mds:
             if md.name == "README.md":
                 continue
-            parts = md.stem.split("_")
-            if len(parts) >= 3:
-                d_str = parts[0]
-                p_str = parts[1]
-                t_str = " ".join(parts[2:]).replace("-", " ").capitalize()
-            else:
-                d_str = md.stem[:10] if len(md.stem) >= 10 else "-"
-                p_str = proj_slug
-                t_str = md.stem[11:].replace("-", " ").capitalize() if len(md.stem) > 11 else md.stem
+            m = date_pattern.match(md.name)
+            if not m:
+                continue
+            d_str = m.group(1)
+            p_str = m.group(2)
+            
+            # Read first line for title if available
+            t_str = ""
+            try:
+                first_line = md.read_text(encoding="utf-8").splitlines()[0]
+                if first_line.startswith("# Architecture Decision:"):
+                    raw_t = first_line.replace("# Architecture Decision:", "").strip()
+                    if raw_t:
+                        t_str = raw_t[:65] + ("..." if len(raw_t) > 65 else "")
+            except Exception:
+                pass
+            if not t_str:
+                t_str = m.group(3).replace("-", " ").replace("_", " ").capitalize()
 
             table_rows.append(f"| `{d_str}` | `{p_str}` | **{t_str}** | [`View Note`](./{md.name}) |")
 
