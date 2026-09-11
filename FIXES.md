@@ -174,3 +174,17 @@ This document contains canonical error signatures, root causes, and verified fix
   2. **Strict Architecture Keyword Enforcement**: Require genuine engineering/architectural keywords (`kinematics`, `firmware`, `architecture`, `controller`, `protocol`, `servo`, `pinout`, `shader`, `webhook`, `state machine`) AND substantive AI reasoning (`len(thinking) >= 120`).
   3. **Regex Date Pattern Indexer**: Index only files strictly matching `^(\d{4}-\d{2}-\d{2})[-_]([a-zA-Z0-9\-]+)[-_](.+)\.md$`. Root meta files are never matched.
   4. **Active Root Clutter Purge**: `classify_thought()` proactively unlinks `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `CONTEXT.md`, `DEVLOG.md`, and `.cursorrules` from `thoughts_repo`.
+
+---
+
+## 15. Repository Root Clutter: Tool Pointers and Metadata Encapsulation in .offgit/
+
+- **Symptom**: New repositories get polluted with 7+ meta files in root (`CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `CONTEXT.md`, `DEVLOG.md`, `.cursorrules`, `.cursor/`), making projects look messy and non-standard on GitHub and in IDEs.
+- **Root Cause**:
+  1. Older offGIT versions ran `ensure_tool_pointers()` to inject editor instructions into project roots instead of relying on global user configurations.
+  2. `prompt_counter.py` and `sync_engine.py` wrote `CONTEXT.md` and `DEVLOG.md` directly into the repository root instead of the `.offgit/` hidden directory.
+- **Canonical Fix**:
+  1. **Abolish Tool Pointers**: Permanently deactivate `ensure_tool_pointers()`; editor rules belong in global user configs (`~/.config/opencode/OPENCODE.md`, `~/.gemini/antigravity/rules/`, `~/.claude/`).
+  2. **Encapsulate in `.offgit/`**: Write `CONTEXT.md` and `DEVLOG.md` into `.offgit/CONTEXT.md` and `.offgit/DEVLOG.md`.
+  3. **Continuous Clutter Purge & Migration**: `sync_engine.py` and `prompt_counter.py` automatically migrate legacy root `CONTEXT.md`/`DEVLOG.md` into `.offgit/`, delete root clutter files, and untrack them from Git (`git rm --cached -f`).
+  4. **Pristine Project Roots**: Because `.offgit/` is ignored in `.gitignore`, remote GitHub repositories and local roots remain 100% spotless.

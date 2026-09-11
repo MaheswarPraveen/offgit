@@ -92,8 +92,8 @@ def main():
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
-    # 3. Update CONTEXT.md (instant local snapshot)
-    context_file = repo / "CONTEXT.md"
+    # 3. Update CONTEXT.md inside .offgit/ (hidden harness directory)
+    context_file = off_dir / "CONTEXT.md"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     md = [
         f"# Live Project Context: {repo.name}",
@@ -106,9 +106,17 @@ def main():
     md.extend([
         "\n## Open Decisions & Next Steps\n",
         "- Continue active implementation according to current focus.",
-        "- Refer to DEVLOG.md for historical architecture decisions.\n"
+        "- Refer to .offgit/DEVLOG.md for chronological development updates.\n"
     ])
     context_file.write_text("\n".join(md), encoding="utf-8")
+
+    # Active root clutter purge: remove legacy root CONTEXT.md if present
+    legacy_context = repo / "CONTEXT.md"
+    if legacy_context.exists():
+        try:
+            legacy_context.unlink()
+        except Exception:
+            pass
 
     # 4. Check milestone
     if count in MILESTONES:

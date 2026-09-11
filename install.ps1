@@ -120,12 +120,12 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
    - When the user starts a project or discusses a concept (e.g. ESP32, Godot game, web app), ensure work is associated with a dedicated subdirectory (e.g. `$scratchDir\<project-name>`).
 
 2. **Context Ingestion on Startup**:
-   - If a `CONTEXT.md` file exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
+   - If `.offgit\CONTEXT.md` (or legacy `CONTEXT.md`) exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
 
 3. **Prompt & Context Logging**:
    - For every task, project turn, or significant user directive, ensure the project directory has its prompt and reasoning recorded by executing:
      `python "$env:USERPROFILE\.offgit\prompt_counter.py" --repo "<project_directory>" --tool antigravity --prompt "<user_request>" --thinking "<your_architectural_rationale>"`
-   - This keeps `CONTEXT.md` updated in real-time (< 1ms) and increments the milestone counter.
+   - This keeps `.offgit\CONTEXT.md` updated in real-time (< 1ms) and increments the milestone counter.
 
 4. **In-Chat Milestone Inception (Prompts 5, 15, 30, 60)**:
    - When `prompt_counter.py` returns `[offGIT MILESTONE <count>]`, proactively ask the user directly in your chat response using the question and suggested name.

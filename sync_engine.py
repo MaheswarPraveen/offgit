@@ -379,11 +379,23 @@ def suggest_repo_name(prompt_log: list[dict], fallback_name: str, tool: str) -> 
     return "-".join(words) or fallback_name
 
 def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
-    devlog_path = Path(repo_path) / "DEVLOG.md"
+    off_dir = Path(repo_path) / ".offgit"
+    off_dir.mkdir(parents=True, exist_ok=True)
+    devlog_path = off_dir / "DEVLOG.md"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     attribution = SOURCE_ATTRIBUTIONS.get(trigger_source, f"Source ({trigger_source})")
 
     entry = f"\n## {now_str} - {attribution}\n\n{strip_emojis(summary)}\n"
+
+    # Migrate legacy root DEVLOG.md content if present
+    legacy_devlog = Path(repo_path) / "DEVLOG.md"
+    if legacy_devlog.exists():
+        try:
+            if not devlog_path.exists():
+                devlog_path.write_text(legacy_devlog.read_text(encoding="utf-8"), encoding="utf-8")
+            legacy_devlog.unlink()
+        except Exception:
+            pass
 
     if devlog_path.exists():
         content = devlog_path.read_text(encoding="utf-8")
@@ -393,10 +405,12 @@ def write_devlog(repo_path: str, summary: str, trigger_source: str) -> None:
         header = f"# Development Log: {repo_name}\n\nAutomated continuity log maintained by offGIT.\n"
         devlog_path.write_text(header + entry, encoding="utf-8")
 
-    logger.info(f"Appended entry to DEVLOG.md in {repo_path} ({attribution})")
+    logger.info(f"Appended entry to .offgit/DEVLOG.md in {repo_path} ({attribution})")
 
 def update_context_md(repo_path: str, summary: str) -> None:
-    context_path = Path(repo_path) / "CONTEXT.md"
+    off_dir = Path(repo_path) / ".offgit"
+    off_dir.mkdir(parents=True, exist_ok=True)
+    context_path = off_dir / "CONTEXT.md"
     repo_name = Path(repo_path).name
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     prompt_context = read_prompt_log(repo_path)
@@ -423,10 +437,19 @@ def update_context_md(repo_path: str, summary: str) -> None:
 
     md_lines.append("\n## Open Decisions & Next Steps\n")
     md_lines.append("- Continue active implementation according to current focus.")
-    md_lines.append("- Refer to DEVLOG.md for historical architecture decisions.\n")
+    md_lines.append("- Refer to .offgit/DEVLOG.md for chronological development updates.\n")
 
     context_path.write_text("\n".join(md_lines), encoding="utf-8")
-    logger.info(f"Overwrote live CONTEXT.md in {context_path}")
+
+    # Migrate and remove legacy root CONTEXT.md if present
+    legacy_context = Path(repo_path) / "CONTEXT.md"
+    if legacy_context.exists():
+        try:
+            legacy_context.unlink()
+        except Exception:
+            pass
+
+    logger.info(f"Overwrote live .offgit/CONTEXT.md in {context_path}")
 
 def is_protected_directory(path: Path | str) -> bool:
     """Returns True if the directory is a system root, user home, or generic placeholder like Default Project."""
@@ -471,11 +494,17 @@ def commit_and_push(repo_path: str) -> None:
     # SECURITY GATE: Strictly untrack and exclude .env files before committing
     run_cmd(["git", "rm", "--cached", "-f", ".env", ".env.local", ".env.production"], cwd=repo_path, timeout=5)
 
-    # CLUTTER PURGE GATE: Continuously purge legacy editor pointer clutter (.cursor, CLAUDE.md, etc.)
-    for junk in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", ".cursorrules", "ARCHITECTURE.md"]:
+    # ROOT CLUTTER PURGE GATE: Continuously purge root clutter (tool pointers, root CONTEXT/DEVLOG, etc.)
+    for junk in ["CLAUDE.md", "CODEX.md", "OPENCODE.md", ".cursorrules", "ARCHITECTURE.md", "CONTEXT.md", "DEVLOG.md"]:
         junk_path = Path(repo_path) / junk
         if junk_path.exists():
             try:
+                # Migrate CONTEXT.md and DEVLOG.md into .offgit/ before deleting if not already present
+                if junk in ["CONTEXT.md", "DEVLOG.md"]:
+                    dest = Path(repo_path) / ".offgit" / junk
+                    if not dest.exists():
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_text(junk_path.read_text(encoding="utf-8"), encoding="utf-8")
                 junk_path.unlink()
                 run_cmd(["git", "rm", "--cached", "-f", junk], cwd=repo_path, timeout=5)
             except Exception:
@@ -588,11 +617,7 @@ def scaffold_repo_direct(repo_path: str, repo_name: str, visibility: str = "") -
 
 ## Overview
 
-This repository contains the codebase and architectural specifications for **{clean_name}**.
-
-- **Live Project State**: Consult [`CONTEXT.md`](./CONTEXT.md) for current focus and open technical decisions.
-- **Changelog & Rationale**: Review [`DEVLOG.md`](./DEVLOG.md) for chronological development updates and technical trade-offs.
-- **Architecture**: See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system design and component specifications.
+This repository contains the production codebase and architectural specifications for **{clean_name}**.
 
 ---
 
@@ -616,12 +641,11 @@ Created with and maintained with:
 """
         readme.write_text(readme_content, encoding="utf-8")
 
-    context_file = p_path / "CONTEXT.md"
+    context_file = p_path / ".offgit" / "CONTEXT.md"
     if not context_file.exists():
         update_context_md(repo_path, f"- Initial project repository initialized for {clean_name}.")
 
     ensure_gitignore(repo_path)
-    ensure_tool_pointers(repo_path)
 
     if not (p_path / ".git").exists():
         run_cmd(["git", "init"], cwd=repo_path, timeout=5)
