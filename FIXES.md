@@ -188,3 +188,13 @@ This document contains canonical error signatures, root causes, and verified fix
   2. **Encapsulate in `.offgit/`**: Write `CONTEXT.md` and `DEVLOG.md` into `.offgit/CONTEXT.md` and `.offgit/DEVLOG.md`.
   3. **Continuous Clutter Purge & Migration**: `sync_engine.py` and `prompt_counter.py` automatically migrate legacy root `CONTEXT.md`/`DEVLOG.md` into `.offgit/`, delete root clutter files, and untrack them from Git (`git rm --cached -f`).
   4. **Pristine Project Roots**: Because `.offgit/` is ignored in `.gitignore`, remote GitHub repositories and local roots remain 100% spotless.
+
+---
+
+## 16. Hardcoded Machine Usernames in Rule Ingestion & Installers
+
+- **Symptom**: Global AI rule files (`GEMINI.md`, `OPENCODE.md`, `AGENTS.md`) get populated with hardcoded usernames (e.g. `C:\Users\specific_user\...`), breaking portability across different developer machines.
+- **Root Cause**: PowerShell installer used an interpolated here-string (`$ruleText = @" ... "@`), which evaluated `$env:USERPROFILE` and `$scratchDir` at installation time and burned the current machine username into the rule files.
+- **Canonical Fix**:
+  1. **Verbatim Here-Strings**: Use `@' ... '@` in `install.ps1` to prevent premature variable expansion.
+  2. **Universal `$HOME` and Tilde (`~`) Paths**: Use `python "$HOME/.offgit/prompt_counter.py"` and `~/.gemini/antigravity/scratch/`. `$HOME` and `~` resolve dynamically at runtime to any user's personal home directory across Windows PowerShell, macOS, and Linux without hardcoding machine usernames.
