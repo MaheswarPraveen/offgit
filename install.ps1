@@ -109,7 +109,7 @@ $geminiConfig = "$env:USERPROFILE\.gemini\config"
 $scratchDir = "$env:USERPROFILE\.gemini\antigravity\scratch"
 New-Item -ItemType Directory -Path "$geminiConfig\rules", $scratchDir -Force | Out-Null
 
-$ruleText = @"
+$ruleText = @'
 # offGIT Global Integration Rule
 
 You are operating with **offGIT**, an ambient agentic development harness running in the background.
@@ -117,24 +117,24 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 ## Automatic Instructions for Every Session
 
 1. **Dedicated Project Subdirectory**:
-   - When the user starts a project or discusses a concept (e.g. ESP32, Godot game, web app), ensure work is associated with a dedicated subdirectory (e.g. `$scratchDir\<project-name>`).
+   - When the user starts a project or discusses a concept (e.g. ESP32, Godot game, web app), ensure work is associated with a dedicated subdirectory (e.g. ~/.gemini/antigravity/scratch/<project-name>).
 
 2. **Context Ingestion on Startup**:
    - If `.offgit\CONTEXT.md` (or legacy `CONTEXT.md`) exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
 
 3. **Prompt & Context Logging**:
    - For every task, project turn, or significant user directive, ensure the project directory has its prompt and reasoning recorded by executing:
-     `python "$env:USERPROFILE\.offgit\prompt_counter.py" --repo "<project_directory>" --tool antigravity --prompt "<user_request>" --thinking "<your_architectural_rationale>"`
+     `python "$HOME/.offgit/prompt_counter.py" --repo "<project_directory>" --tool antigravity --prompt "<user_request>" --thinking "<your_architectural_rationale>"`
    - This keeps `.offgit\CONTEXT.md` updated in real-time (< 1ms) and increments the milestone counter.
 
 4. **In-Chat Milestone Inception (Prompts 5, 15, 30, 60)**:
    - When `prompt_counter.py` returns `[offGIT MILESTONE <count>]`, proactively ask the user directly in your chat response using the question and suggested name.
    - When the user confirms or gives a custom name, execute:
-     `python "$env:USERPROFILE\.offgit\sync_engine.py" --repo "<project_directory>" --scaffold --name "<confirmed_name>"`
+     `python "$HOME/.offgit/sync_engine.py" --repo "<project_directory>" --scaffold --name "<confirmed_name>"`
 
 5. **Token-Efficient Self-Healing & Error Reference (FIXES.md)**:
-   - When diagnosing errors or debugging offGIT behavior, consult `~/.offgit/FIXES.md` (or run `python "$env:USERPROFILE\.offgit\sync_engine.py" --fix`) first before performing broad search to achieve 1-shot fixes with minimal token usage.
-"@
+   - When diagnosing errors or debugging offGIT behavior, consult `~/.offgit/FIXES.md` (or run `python "$HOME/.offgit/sync_engine.py" --fix`) first before performing broad search to achieve 1-shot fixes with minimal token usage.
+'@
 
 [System.IO.File]::WriteAllText("$geminiConfig\GEMINI.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText("$geminiConfig\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))

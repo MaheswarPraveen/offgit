@@ -123,7 +123,7 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 ## Automatic Instructions for Every Session
 
 1. **Dedicated Project Subdirectory**:
-   - When the user starts a project or discusses a concept, ensure work is associated with a dedicated subdirectory (e.g. $SCRATCH_DIR/<project-name>).
+   - When the user starts a project or discusses a concept, ensure work is associated with a dedicated subdirectory (e.g. ~/.gemini/antigravity/scratch/<project-name>).
 
 2. **Context Ingestion on Startup**:
    - If .offgit/CONTEXT.md (or CONTEXT.md) exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
