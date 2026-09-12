@@ -55,6 +55,63 @@ def is_already_github_repo(repo: Path) -> bool:
     except Exception:
         return False
 
+def is_watcher_running() -> bool:
+    """Checks if the offGIT watcher daemon is actively running (< 1ms)."""
+    pid_file = Path.home() / ".offgit" / "watcher.pid"
+    if not pid_file.exists():
+        return False
+    try:
+        pid = int(pid_file.read_text(encoding="utf-8").strip())
+        if os.name == "nt":
+            import ctypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                ctypes.windll.kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            os.kill(pid, 0)
+            return True
+    except Exception:
+        return False
+
+def ensure_watcher_running() -> None:
+    """Quietly resurrects the watcher daemon if it is not currently running."""
+    if is_watcher_running():
+        return
+
+    offgit_dir = Path.home() / ".offgit"
+    watcher_script = offgit_dir / "watcher.py"
+    if not watcher_script.exists():
+        return
+
+    try:
+        if os.name == "nt":
+            py_exe = Path(sys.executable)
+            pyw = py_exe.parent / "pythonw.exe"
+            exe = str(pyw) if pyw.exists() else sys.executable
+            DETACHED = 0x00000008
+            subprocess.Popen(
+                [exe, str(watcher_script), "--force"],
+                creationflags=DETACHED | NO_WINDOW,
+                close_fds=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL
+            )
+        else:
+            subprocess.Popen(
+                [sys.executable, str(watcher_script), "--force"],
+                start_new_session=True,
+                close_fds=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL
+            )
+    except Exception:
+        pass
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=str, required=True)
@@ -62,6 +119,7 @@ def main():
     parser.add_argument("--tool", type=str, default="antigravity")
     parser.add_argument("--thinking", type=str, default="")
     args = parser.parse_args()
+    ensure_watcher_running()
 
     repo = Path(args.repo).resolve()
     off_dir = repo / ".offgit"
