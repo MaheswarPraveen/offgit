@@ -88,18 +88,24 @@ def ensure_watcher_running() -> None:
 
     try:
         if os.name == "nt":
-            py_exe = Path(sys.executable)
-            pyw = py_exe.parent / "pythonw.exe"
-            exe = str(pyw) if pyw.exists() else sys.executable
-            DETACHED = 0x00000008
-            subprocess.Popen(
-                [exe, str(watcher_script), "--force"],
-                creationflags=DETACHED | NO_WINDOW,
-                close_fds=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL
-            )
+            # On Windows, launch via WMI through start_offgit.vbs to decouple
+            # completely from the parent process tree / Windows Job Object
+            vbs = offgit_dir / "start_offgit.vbs"
+            if vbs.exists():
+                subprocess.run(["wscript.exe", str(vbs)], creationflags=NO_WINDOW, timeout=5)
+            else:
+                py_exe = Path(sys.executable)
+                pyw = py_exe.parent / "pythonw.exe"
+                exe = str(pyw) if pyw.exists() else sys.executable
+                DETACHED = 0x00000008
+                subprocess.Popen(
+                    [exe, str(watcher_script), "--force"],
+                    creationflags=DETACHED | NO_WINDOW,
+                    close_fds=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL
+                )
         else:
             subprocess.Popen(
                 [sys.executable, str(watcher_script), "--force"],
