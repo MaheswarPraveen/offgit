@@ -149,6 +149,7 @@ echo "$RULE_TEXT" > "$HOME/.gemini/antigravity/rules/offgit.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/GEMINI.md"
 echo "$RULE_TEXT" > "$SCRATCH_DIR/AGENTS.md"
 echo "$RULE_TEXT" > "$HOME/.config/opencode/OPENCODE.md"
+echo "$RULE_TEXT" > "$HOME/.config/opencode/AGENTS.md"
 
 if [ ! -f "$HOME/.claude/settings.json" ]; then
     cat << 'EOF' > "$HOME/.claude/settings.json"

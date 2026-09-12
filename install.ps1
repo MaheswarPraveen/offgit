@@ -150,6 +150,7 @@ New-Item -ItemType Directory -Path "$agyApp\rules" -Force | Out-Null
 $opencodeConfig = "$env:USERPROFILE\.config\opencode"
 New-Item -ItemType Directory -Path $opencodeConfig -Force | Out-Null
 [System.IO.File]::WriteAllText("$opencodeConfig\OPENCODE.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText("$opencodeConfig\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 
 # 6. Windows Startup Registration & Silent Background Launch via WMI
 Write-Host "`n[5/5] Registering silent autostart on logon and launching daemon..." -ForegroundColor Yellow

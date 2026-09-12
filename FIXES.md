@@ -215,3 +215,16 @@ This document contains canonical error signatures, root causes, and verified fix
   1. **Purge Silent Scaffolding**: Completely removed `gh repo create` from `commit_and_push()`. Repositories without a remote remain strictly local (`git commit` only).
   2. **Enforce Milestone Inception Protocol**: Remote repository creation is exclusively gated behind explicit user confirmation (`--scaffold` invoked after user approval at milestones 5, 15, 30, 60).
   3. **Zero Remote Push Without Configured Remote**: `commit_and_push()` logs local commit creation and safely skips remote push if no remote is configured.
+
+---
+
+## 18. OpenCode Global Instructions & Default Project Isolation
+
+- **Symptom**: OpenCode fails to execute `prompt_counter.py`, fails to trigger in-chat milestone questions, and defaults all project work directly into `Documents/Default Project`.
+- **Root Cause**:
+  1. OpenCode Desktop's Electron application core (`app.asar`) hardcodes `const DEFAULT_PROJECT_DIR = "Default Project"`, causing all initial sessions to bind to `Documents/Default Project`.
+  2. OpenCode's instruction loader specifically inspects `globalFiles = [ path.join(global.config, "AGENTS.md") ]` and ignores `OPENCODE.md`.
+  3. Installers previously wrote offGIT instructions solely to `~/.config/opencode/OPENCODE.md`, leaving OpenCode with an unconfigured or legacy `AGENTS.md` that lacked dedicated subdirectory constraints and prompt-logging directives.
+- **Canonical Fix**:
+  1. **Synchronized Agent Rules**: Updated `install.ps1` and `install.sh` to populate both `~/.config/opencode/AGENTS.md` and `~/.config/opencode/OPENCODE.md`.
+  2. **Explicit Directory Quarantine**: Configured `AGENTS.md` with strict dedicated subdirectory directives (`~/.gemini/antigravity/scratch/<project-name>`), explicitly barring the model from writing project files directly into `Default Project`.
