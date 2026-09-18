@@ -46,6 +46,9 @@ class IdleEventHandler(FileSystemEventHandler):
             watched_bases = [Path(d).resolve() for d in get_watched_directories()]
 
             while cur != cur.parent and cur != home:
+                if cur in watched_bases:
+                    # Do not treat watched container directories (e.g. scratch, Projects) as repositories
+                    break
                 if (cur / ".git").exists() or (cur / ".offgit").exists():
                     return str(cur)
                 for base in watched_bases:
@@ -82,8 +85,6 @@ def discover_watched_repos() -> set[str]:
         base_p = Path(base)
         if not base_p.exists():
             continue
-        if (base_p / ".git").exists() or (base_p / ".offgit").exists():
-            repos.add(str(base_p))
         try:
             for child in base_p.iterdir():
                 if child.is_dir() and ((child / ".git").exists() or (child / ".offgit").exists()):

@@ -463,6 +463,19 @@ def is_protected_directory(path: Path | str) -> bool:
             return True
         if resolved.name.lower() in {"default project", "default-project"}:
             return True
+        # Protect base watched container directories (e.g. scratch, Projects, dev)
+        watched_bases = [Path(d).expanduser().resolve() for d in CONFIG.get("watched_directories", [
+            "~/.gemini/antigravity/scratch",
+            "~/Documents/Arduino",
+            "~/Projects",
+            "~/workspace",
+            "~/dev"
+        ])]
+        if resolved in watched_bases:
+            return True
+        if resolved.name.lower() in {"scratch", "projects", "workspace", "dev", "default project", "default-project"}:
+            if resolved.parent == Path.home().resolve() / ".gemini" / "antigravity" or resolved.parent == home:
+                return True
     except Exception:
         pass
     return False
@@ -674,53 +687,55 @@ def clean_prompt_summary(text: str) -> str:
     return cleaned
 
 def is_genuine_architectural_thought(summary: str, thinking: str) -> bool:
-    """Filters out casual chit-chat, frustration, and meta-queries to ensure only real technical decisions reach thoughts."""
+    """Filters out trivial chit-chat, frustration rants, and meta-prompts to ensure technical decisions and designs reach thoughts."""
     s = summary.strip()
     t = thinking.strip()
 
     # Reject empty or very short messages
-    if len(s) < 15:
-        return False
-
-    # Questions are investigations or help requests, not architectural decisions
-    if s.endswith("?"):
+    if len(s) < 10:
         return False
 
     import re
-    # Blocklist of conversational chatter, frustration phrases, profanity, and meta prompts using word boundaries
-    conversational_regex = re.compile(
-        r"\b(hi|hello|hey|cool|yeah|nope|okay|ok|thanks|"
-        r"wtf|fuck|frick|shit|bro|dude|bruh|damn|crap|"
-        r"dumb|kidding me|ridiculous|destroyed|terrible|sucks|"
-        r"why|how come|how do we|how can|how to|what about|what now|"
-        r"where|is it|are you|are these|can you|can we|could you|tell me|show me|check|"
-        r"so what do i do|delete it|still not|doesnt look|try it out|no reply|"
-        r"no i want|no i mean|okay im|now im|looks very|so now|well i think|"
-        r"before that|wait just|yes but|actually we|just give|just run|ill do|you do it|make it more|"
-        r"thoughts md|offgit|clean up|remove|undo|redo|default project|taking my thoughts)\b",
+    # Check if the summary is purely conversational filler, greetings, or short acknowledgments
+    pure_chatter_regex = re.compile(
+        r"^(\s*(hi|hello|hey|cool|yeah|yes|no|nope|okay|ok|thanks|thank you|good|great|awesome|fine)\s*[.!]?)+$",
         re.IGNORECASE
     )
-    if conversational_regex.search(s):
+    if pure_chatter_regex.match(s):
         return False
 
-    # Must contain genuine architectural or core engineering terms
+    # Filter out offGIT harness meta-queries or system complaints
+    meta_complaints_regex = re.compile(
+        r"\b(offgit|taking my thoughts|thoughts md|prompt counter|sync engine)\b",
+        re.IGNORECASE
+    )
+    if meta_complaints_regex.search(s):
+        return False
+
+    # Substantive engineering keywords across embedded, AI/ML, computer vision, backend, frontend, architecture, and systems
     technical_regex = re.compile(
-        r"\b(implement|refactor|architecture|kinematics|firmware|"
-        r"algorithm|controller|protocol|hardware|schema|optimize|"
-        r"state machine|interface|driver|pipeline|security|"
-        r"servo|pinout|inverse kinematics|dh parameters|can bus|"
-        r"i2c|spi|uart|telemetry|ros2|shader|webgl|"
-        r"kalman|sensor fusion|webhook|fastapi|rest api)\b",
+        r"\b(implement|refactor|architecture|kinematics|firmware|hardware|pinout|servo|motor|"
+        r"sensor|esp32|arduino|gpio|i2c|spi|uart|can bus|telemetry|ros2|algorithm|controller|"
+        r"protocol|schema|optimize|state machine|interface|driver|pipeline|security|shader|"
+        r"webgl|kalman|sensor fusion|webhook|fastapi|rest api|api|endpoint|backend|frontend|"
+        r"server|database|sqlite|postgres|redis|sql|model|neural|dataset|inference|detection|"
+        r"vision|yolo|opencv|cctv|stream|socket|worker|daemon|concurrency|async|thread|cache|"
+        r"docker|container|deploy|linux|android|apk|wine|winlator|dxvk|emulator|render|ui|view|"
+        r"component|state|workflow|lifecycle|build|release|setup|install)\b",
         re.IGNORECASE
     )
-    if not technical_regex.search(s):
-        return False
 
-    # Must also have substantive AI architectural reasoning (> 120 chars)
-    if len(t) < 120:
-        return False
+    has_technical_directive = bool(technical_regex.search(s))
+    has_substantive_reasoning = len(t) >= 60 and bool(technical_regex.search(t))
 
-    return True
+    # A thought is genuine if either the directive contains technical concepts with reasoning,
+    # or the AI architectural reasoning itself articulates concrete technical decisions.
+    if has_technical_directive and len(t) >= 40:
+        return True
+    if has_substantive_reasoning:
+        return True
+
+    return False
 
 def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path: str = "") -> None:
     """Ingests ONLY genuine, unique technical decisions into the private thoughts repo with strict anti-spam deduplication."""
@@ -797,10 +812,14 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
         if not valid_entries:
             return
 
-        # Derive clean topic slug without minute timestamps or stop words
+        # Derive clean topic slug without minute timestamps or conversational stop words
         primary_entry = valid_entries[-1]
         primary_summary = primary_entry["summary"]
-        stop_words = {"the", "a", "an", "and", "or", "to", "in", "for", "with", "on", "at", "by", "from", "of", "is", "it"}
+        stop_words = {
+            "the", "a", "an", "and", "or", "to", "in", "for", "with", "on", "at", "by", "from", "of", "is", "it",
+            "we", "i", "can", "how", "why", "what", "do", "you", "me", "this", "that", "dude", "bro", "please", "just",
+            "make", "need", "want", "built", "made", "get", "let", "lets"
+        }
         clean_words = [w for w in "".join(c if c.isalnum() else " " for c in primary_summary.lower()).split() if w not in stop_words]
         topic_slug = "-".join(clean_words[:5]) or "architecture-decision"
 
@@ -896,6 +915,15 @@ def classify_thought(diff: str, prompt_context: list[dict], tool: str, repo_path
                 return
             run_cmd(["git", "push", "origin", "main"], cwd=str(thoughts_repo), timeout=30)
             logger.info(f"Auto-synced genuine architecture decision to private thoughts repo.")
+
+            # Dual-sync to local workspace copy if present (e.g. scratch/thoughts)
+            workspace_thoughts = Path.home() / ".gemini" / "antigravity" / "scratch" / "thoughts"
+            if workspace_thoughts.exists() and (workspace_thoughts / ".git").exists() and workspace_thoughts.resolve() != thoughts_repo.resolve():
+                try:
+                    run_cmd(["git", "pull", "--rebase", "origin", "main"], cwd=str(workspace_thoughts), timeout=20)
+                    logger.info(f"Dual-synced local workspace thoughts clone at {workspace_thoughts}")
+                except Exception as we:
+                    logger.debug(f"Could not dual-sync workspace thoughts: {we}")
 
     except Exception as e:
         logger.error(f"Error in classify_thought: {e}", exc_info=True)
