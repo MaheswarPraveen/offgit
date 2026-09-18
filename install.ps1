@@ -122,13 +122,13 @@ You are operating with **offGIT**, an ambient agentic development harness runnin
 2. **Context Ingestion on Startup**:
    - If `.offgit\CONTEXT.md` (or legacy `CONTEXT.md`) exists in the active project root, read it immediately to ingest the current active state, recent directives, and open architectural decisions.
 
-3. **Prompt & Context Logging**:
-   - For every task, project turn, or significant user directive, ensure the project directory has its prompt and reasoning recorded by executing:
-     `python "$HOME/.offgit/prompt_counter.py" --repo "<project_directory>" --tool antigravity --prompt "<user_request>" --thinking "<your_architectural_rationale>"`
-   - This keeps `.offgit\CONTEXT.md` updated in real-time (< 1ms) and increments the milestone counter.
+3. **Ambient Zero-Latency Execution**:
+   - offGIT operates ambiently in the background. NEVER block or delay chat responses with standalone prompt logging tool calls.
+   - For conversational messages, questions, diagnostics, planning, reviews, and general queries, respond directly and immediately with zero tool calls.
+   - When actively creating or modifying code files in a project, you may log the prompt alongside your file edits, or rely on offGIT's ambient background watcher—never make the user wait through a separate pre-turn command execution.
 
 4. **In-Chat Milestone Inception (Prompts 5, 15, 30, 60)**:
-   - When `prompt_counter.py` returns `[offGIT MILESTONE <count>]`, proactively ask the user directly in your chat response using the question and suggested name.
+   - When milestone triggers are reached, proactively ask the user directly in your chat response using the question and suggested name.
    - When the user confirms or gives a custom name, execute:
      `python "$HOME/.offgit/sync_engine.py" --repo "<project_directory>" --scaffold --name "<confirmed_name>"`
 
@@ -150,7 +150,6 @@ New-Item -ItemType Directory -Path "$agyApp\rules" -Force | Out-Null
 $opencodeConfig = "$env:USERPROFILE\.config\opencode"
 New-Item -ItemType Directory -Path $opencodeConfig -Force | Out-Null
 [System.IO.File]::WriteAllText("$opencodeConfig\OPENCODE.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
-[System.IO.File]::WriteAllText("$opencodeConfig\AGENTS.md", $ruleText, [System.Text.UTF8Encoding]::new($false))
 
 # 6. Windows Startup Registration & Silent Background Launch via WMI
 Write-Host "`n[5/5] Registering silent autostart on logon and launching daemon..." -ForegroundColor Yellow

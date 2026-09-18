@@ -125,9 +125,23 @@ def main():
     parser.add_argument("--tool", type=str, default="antigravity")
     parser.add_argument("--thinking", type=str, default="")
     args = parser.parse_args()
-    ensure_watcher_running()
+    # Fast-path: avoid process table scanning if watcher daemon PID file exists
+    pid_file = Path.home() / ".offgit" / "watcher.pid"
+    if not pid_file.exists():
+        ensure_watcher_running()
 
     repo = Path(args.repo).resolve()
+    watched_bases = [
+        (Path.home() / ".gemini" / "antigravity" / "scratch").resolve(),
+        (Path.home() / "Documents" / "Arduino").resolve(),
+        (Path.home() / "Projects").resolve(),
+        (Path.home() / "workspace").resolve(),
+        (Path.home() / "dev").resolve()
+    ]
+    if repo in watched_bases or repo == Path.home().resolve():
+        print(f"[offGIT] Protected container directory '{repo.name}' skipped.")
+        return
+
     off_dir = repo / ".offgit"
     off_dir.mkdir(parents=True, exist_ok=True)
 
