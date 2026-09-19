@@ -24,6 +24,7 @@ class IdleEventHandler(FileSystemEventHandler):
         super().__init__()
         self.extensions = set(ext.lower() for ext in extensions)
         self.active_repos = set()
+        self.repo_last_modified: dict[str, float] = {}
 
     def on_any_event(self, event):
         if event.is_directory:
@@ -37,6 +38,7 @@ class IdleEventHandler(FileSystemEventHandler):
             repo_dir = self.find_repo_root(event.src_path)
             if repo_dir:
                 self.active_repos.add(repo_dir)
+                self.repo_last_modified[repo_dir] = time.time()
                 logger.debug(f"File modification in {event.src_path} (repo: {repo_dir})")
 
     def find_repo_root(self, file_path: str) -> str | None:
@@ -92,6 +94,40 @@ def discover_watched_repos() -> set[str]:
         except Exception as e:
             logger.debug(f"Error scanning {base}: {e}")
     return repos
+
+def idle_debounce_sync_loop(handler: IdleEventHandler):
+    """Monitors active repos and fires a sync after 60 seconds of inactivity."""
+    idle_threshold = CONFIG.get("context_push_debounce_seconds", 60)
+    logger.info(f"Idle debounce sync loop started (threshold: {idle_threshold}s)")
+
+    while True:
+        try:
+            time.sleep(5)
+            now = time.time()
+            repos_to_sync = []
+
+            for repo, last_mod in list(handler.repo_last_modified.items()):
+                if now - last_mod >= idle_threshold:
+                    repos_to_sync.append(repo)
+                    handler.repo_last_modified.pop(repo, None)
+
+            if repos_to_sync:
+                ready, msg = check_github_prerequisites()
+                if not ready:
+                    logger.warning(f"Idle debounce sync paused: {msg}")
+                    continue
+
+                for repo in repos_to_sync:
+                    try:
+                        diff = get_diff(repo)
+                        unsynced = get_unsynced_prompts(repo)
+                        if diff.strip() or unsynced:
+                            logger.info(f"Firing idle debounce sync for: {repo}")
+                            run_sync(repo, "watcher")
+                    except Exception as e:
+                        logger.error(f"Error in idle debounce sync on {repo}: {e}")
+        except Exception as e:
+            logger.debug(f"Error in idle debounce loop: {e}")
 
 def devlog_10min_batch_loop(handler: IdleEventHandler):
     interval = CONFIG.get("devlog_interval_seconds", 600)
@@ -287,6 +323,9 @@ def main():
         for d in dirs:
             logger.info(f"Watching directory: {d}")
             observer.schedule(handler, d, recursive=True)
+
+        debounce_thread = threading.Thread(target=idle_debounce_sync_loop, args=(handler,), daemon=True)
+        debounce_thread.start()
 
         loop_thread = threading.Thread(target=devlog_10min_batch_loop, args=(handler,), daemon=True)
         loop_thread.start()
