@@ -129,11 +129,31 @@ def get_verified_git_email() -> str:
     return "maheswarpraveen@gmail.com"
 
 def check_github_prerequisites() -> tuple[bool, str]:
-    """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated."""
+    """Strict pre-flight gate: verifies GitHub CLI is installed and authenticated without network timeouts."""
     if shutil.which("gh") is None:
         return False, "GitHub CLI ('gh') is not installed. offGIT requires GitHub CLI to operate. Install via: winget install GitHub.cli (or brew install gh / apt install gh)"
 
-    code, out, err = run_cmd(["gh", "auth", "status"], timeout=10)
+    # 1. Fast local check via hosts.yml (< 1ms)
+    try:
+        config_paths = [
+            Path(os.environ.get("APPDATA", "")) / "GitHub CLI" / "hosts.yml",
+            Path.home() / ".config" / "gh" / "hosts.yml"
+        ]
+        for cp in config_paths:
+            if cp.exists():
+                txt = cp.read_text(encoding="utf-8", errors="ignore")
+                if "oauth_token" in txt or "user:" in txt:
+                    return True, ""
+    except Exception:
+        pass
+
+    # 2. Local token retrieval (no network lag)
+    code_t, token_out, _ = run_cmd(["gh", "auth", "token"], timeout=3)
+    if code_t == 0 and token_out.strip():
+        return True, ""
+
+    # 3. Fallback to status command
+    code, out, err = run_cmd(["gh", "auth", "status"], timeout=15)
     if code != 0:
         return False, "GitHub CLI is not authenticated. offGIT requires an authenticated GitHub session. Please run: gh auth login"
 
